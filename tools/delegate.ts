@@ -5,6 +5,7 @@ import { tool } from "@opencode-ai/plugin"
 const WORKERS: Record<string, string> = {
   backend: process.env.BACKEND_URL ?? "http://opencode-backend:4096",
   frontend: process.env.FRONTEND_URL ?? "http://opencode-frontend:4096",
+  "aws-solutions-architect": process.env.AWS_ARCHITECT_URL ?? "http://opencode-aws-architect:4096",
 }
 
 const USERNAME = process.env.OPENCODE_SERVER_USERNAME ?? "opencode"
@@ -24,12 +25,12 @@ async function call(url: string, init: RequestInit) {
 
 export default tool({
   description:
-    "Send a task to the frontend or backend worker agent and wait for its report. " +
+    "Send a task to the frontend, backend or aws-solutions-architect worker agent and wait for its report. " +
     "The worker does not see this conversation, so the prompt must be self-contained. " +
     "Call it several times in one turn to run independent tasks in parallel. " +
     "Pass the returned sessionId back to follow up with the same worker.",
   args: {
-    agent: tool.schema.enum(["backend", "frontend"]).describe("Worker that should do the task"),
+    agent: tool.schema.enum(["backend", "frontend", "aws-solutions-architect"]).describe("Worker that should do the task"),
     prompt: tool.schema.string().describe("Complete task: ID, description, acceptance criteria, API contract, time left, report format"),
     sessionId: tool.schema.string().optional().describe("Continue an earlier session with this worker instead of starting a new one"),
   },

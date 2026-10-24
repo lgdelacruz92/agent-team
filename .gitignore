@@ -4,3 +4,4 @@ answer.md
 *.md
 *.json
 !**/*/package.json
+!agents/*.md
