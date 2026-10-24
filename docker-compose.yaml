@@ -1,39 +1,76 @@
 
-services:
-  opencode:
-    image: ghcr.io/anomalyco/opencode:latest
-    container_name: opencode-agent
-    restart: unless-stopped
+x-opencode: &opencode
+  image: ghcr.io/anomalyco/opencode:latest
+  restart: unless-stopped
+  working_dir: /workspace
+  networks:
+    - shared
 
+x-opencode-env: &opencode-env
+  OPENCODE_SERVER_PASSWORD: ${OPENCODE_SERVER_PASSWORD:-password124}
+  OPENCODE_SERVER_USERNAME: opencode
+
+x-opencode-command: &opencode-command
+  - serve
+  - --hostname
+  - 0.0.0.0
+  - --port
+  - "4096"
+  - --print-logs
+  - --log-level
+  - DEBUG
+
+services:
+  # You talk to this one. It plans the work and delegates to backend and frontend.
+  planner:
+    <<: *opencode
+    container_name: opencode-planner
     ports:
       - "127.0.0.1:4096:4096"
-
     environment:
-      OPENCODE_SERVER_PASSWORD: ${OPENCODE_SERVER_PASSWORD:-password124}
-      OPENCODE_SERVER_USERNAME: opencode
-
+      <<: *opencode-env
+      OPENCODE_CONFIG_CONTENT: '{"default_agent":"planner"}'
     volumes:
       - ./workspace:/workspace
       - ./opencode.json:/workspace/opencode.json:ro
-      - opencode-data:/root/.local/share/opencode
+      - ./agents/planner.md:/root/.config/opencode/agents/planner.md:ro
+      - planner-data:/root/.local/share/opencode
+    command: *opencode-command
 
-    working_dir: /workspace
+  backend:
+    <<: *opencode
+    container_name: opencode-backend
+    ports:
+      - "127.0.0.1:4097:4096"
+    environment:
+      <<: *opencode-env
+      OPENCODE_CONFIG_CONTENT: '{"default_agent":"backend"}'
+    volumes:
+      - ./workspace:/workspace
+      - ./opencode.json:/workspace/opencode.json:ro
+      - ./agents/backend.md:/root/.config/opencode/agents/backend.md:ro
+      - backend-data:/root/.local/share/opencode
+    command: *opencode-command
 
-    networks:
-      - shared
-
-    command:
-      - serve
-      - --hostname
-      - 0.0.0.0
-      - --port
-      - "4096"
-      - --print-logs
-      - --log-level
-      - DEBUG
+  frontend:
+    <<: *opencode
+    container_name: opencode-frontend
+    ports:
+      - "127.0.0.1:4098:4096"
+    environment:
+      <<: *opencode-env
+      OPENCODE_CONFIG_CONTENT: '{"default_agent":"frontend"}'
+    volumes:
+      - ./workspace:/workspace
+      - ./opencode.json:/workspace/opencode.json:ro
+      - ./agents/frontend.md:/root/.config/opencode/agents/frontend.md:ro
+      - frontend-data:/root/.local/share/opencode
+    command: *opencode-command
 
 volumes:
-  opencode-data:
+  planner-data:
+  backend-data:
+  frontend-data:
 
 networks:
   shared:
