@@ -28,6 +28,9 @@ services:
       - 0.0.0.0
       - --port
       - "4096"
+      - --print-logs
+      - --log-level
+      - DEBUG
 
 volumes:
   opencode-data:
