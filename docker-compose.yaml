@@ -1,0 +1,39 @@
+
+services:
+  opencode:
+    image: ghcr.io/anomalyco/opencode:latest
+    container_name: opencode-agent
+    restart: unless-stopped
+
+    ports:
+      - "127.0.0.1:4096:4096"
+
+    environment:
+      AWS_BEARER_TOKEN_BEDROCK: ${AWS_BEARER_TOKEN_BEDROCK:?Bedrock API key required}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      OPENCODE_SERVER_PASSWORD: ${OPENCODE_SERVER_PASSWORD:?Password required}
+      OPENCODE_SERVER_USERNAME: opencode
+
+    volumes:
+      - ./workspace:/workspace
+      - ./opencode.json:/workspace/opencode.json:ro
+      - opencode-data:/root/.local/share/opencode
+
+    working_dir: /workspace
+
+    networks:
+      - shared
+
+    command:
+      - serve
+      - --hostname
+      - 0.0.0.0
+      - --port
+      - "4096"
+
+volumes:
+  opencode-data:
+
+networks:
+  shared:
+    name: shared
