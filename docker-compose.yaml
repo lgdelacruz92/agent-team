@@ -30,11 +30,18 @@ services:
     environment:
       <<: *opencode-env
       OPENCODE_CONFIG_CONTENT: '{"default_agent":"planner"}'
+      # delegate tool reaches the workers over the shared network
+      BACKEND_URL: http://opencode-backend:4096
+      FRONTEND_URL: http://opencode-frontend:4096
     volumes:
       - ./workspace:/workspace
       - ./opencode.json:/workspace/opencode.json:ro
       - ./agents/planner.md:/root/.config/opencode/agents/planner.md:ro
+      - ./tools/delegate.ts:/root/.config/opencode/tools/delegate.ts:ro
       - planner-data:/root/.local/share/opencode
+    depends_on:
+      - backend
+      - frontend
     command: *opencode-command
 
   backend:
