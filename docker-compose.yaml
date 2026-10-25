@@ -90,11 +90,39 @@ services:
       - aws-architect-data:/root/.local/share/opencode
     command: *opencode-command
 
+  # Lets the allowed Mattermost users talk to the CTO. Reaches Mattermost through the SSM port forward
+  # on the host (blackberry/ssh-ec2.sh --forward) and the CTO over the shared network.
+  bridge:
+    build: ./bridge
+    container_name: opencode-bridge
+    restart: unless-stopped
+    env_file: .env
+    working_dir: /app
+    environment:
+      MATTERMOST_URL: http://host.docker.internal:8065
+      OPENCODE_URL: http://opencode-cto:4096
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:3100:3000"
+    volumes:
+      - bridge-data:/data
+    networks:
+      - shared
+    depends_on:
+      - cto
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+
 volumes:
   cto-data:
   backend-data:
   frontend-data:
   aws-architect-data:
+  bridge-data:
 
 networks:
   shared:

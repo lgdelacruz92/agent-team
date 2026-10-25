@@ -6,6 +6,7 @@
 #   AWS_PROFILE=dev AWS_REGION=us-east-1 ./ssh-ec2.sh --shell     # interactive shell, no port forward
 #   AWS_PROFILE=dev AWS_REGION=us-east-1 ./ssh-ec2.sh --forward   # forward localhost:8065 (Mattermost) to the instance
 #   AWS_PROFILE=dev AWS_REGION=us-east-1 ./ssh-ec2.sh --forward vikunja   # forward localhost:3456 (Vikunja)
+#   AWS_PROFILE=dev AWS_REGION=us-east-1 ./ssh-ec2.sh --forward all   # forward both (Mattermost and Vikunja)
 #
 # Required env vars: AWS_PROFILE, AWS_REGION
 # Optional env vars: STACK_NAME (blackberry), LOCAL_PORT (the app's port)
@@ -37,11 +38,25 @@ fi
 
 echo "Profile: $AWS_PROFILE  Region: $AWS_REGION  Instance: $instance_id"
 
+forward_port() {
+  aws "${aws_args[@]}" ssm start-session \
+    --target "$instance_id" \
+    --document-name AWS-StartPortForwardingSession \
+    --parameters "portNumber=$1,localPortNumber=$2"
+}
+
 if [[ "${1:-}" == "--forward" ]]; then
   case "${2:-mattermost}" in
     mattermost) remote_port=8065 ;;
     vikunja) remote_port=3456 ;;
-    *) echo "Unknown app: $2 (use mattermost or vikunja)" >&2; exit 1 ;;
+    all)
+      echo "Forwarding http://localhost:8065 (Mattermost) and http://localhost:3456 (Vikunja) (Ctrl+C to stop)"
+      forward_port 3456 3456 &
+      trap 'kill $! 2>/dev/null' EXIT
+      forward_port 8065 8065
+      exit
+      ;;
+    *) echo "Unknown app: $2 (use mattermost, vikunja or all)" >&2; exit 1 ;;
   esac
   LOCAL_PORT="${LOCAL_PORT:-$remote_port}"
   echo "Forwarding http://localhost:$LOCAL_PORT -> instance:$remote_port (Ctrl+C to stop)"
@@ -53,7 +68,7 @@ fi
 
 case "${1:-}" in
   ""|--shell) ;;
-  *) echo "Unknown option: $1 (use --shell or --forward [mattermost|vikunja])" >&2; exit 1 ;;
+  *) echo "Unknown option: $1 (use --shell or --forward [mattermost|vikunja|all])" >&2; exit 1 ;;
 esac
 
 echo "Opening shell as ssm-user (run 'sudo -i' for root)"
