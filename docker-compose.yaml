@@ -2,6 +2,7 @@
 x-opencode: &opencode
   image: ghcr.io/anomalyco/opencode:latest
   restart: unless-stopped
+  platform: linux/amd64
   env_file: .env
   working_dir: /workspace
   networks:
@@ -87,6 +88,7 @@ services:
   mattermost-db:
     image: postgres:16-alpine
     container_name: mattermost-db
+    platform: linux/amd64
     restart: unless-stopped
     env_file: .env
     volumes:
@@ -102,6 +104,7 @@ services:
   mattermost:
     image: mattermost/mattermost-team-edition:latest
     container_name: mattermost
+    platform: linux/amd64
     restart: unless-stopped
     ports:
       - "127.0.0.1:8065:8065"
