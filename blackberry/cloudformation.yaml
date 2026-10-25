@@ -77,3 +77,9 @@ Outputs:
   InstanceId:
     Value: !Ref Instance
     Description: Connect with `aws ssm start-session --target <id>`.
+  InstanceSecurityGroupId:
+    Value: !Ref InstanceSecurityGroup
+    Description: Pass to the agent-team stack (BlackberrySecurityGroupId) so it can reach Mattermost and Vikunja.
+  PrivateIp:
+    Value: !GetAtt Instance.PrivateIp
+    Description: Address other instances in the VPC use to reach Mattermost (8065) and Vikunja (3456).

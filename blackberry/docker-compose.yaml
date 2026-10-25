@@ -19,7 +19,7 @@ services:
     platform: linux/amd64
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8065:8065"
+      - "${BIND_ADDRESS:-127.0.0.1}:8065:8065"
     env_file: .env
     volumes:
       - mattermost-config:/mattermost/config
@@ -48,7 +48,7 @@ services:
     platform: linux/amd64
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3456:3456"
+      - "${BIND_ADDRESS:-127.0.0.1}:3456:3456"
     env_file: .env
     volumes:
       - vikunja-files:/app/vikunja/files

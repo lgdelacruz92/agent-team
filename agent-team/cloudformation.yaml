@@ -20,6 +20,14 @@ Parameters:
     Default: 50
     Description: Root volume. The agents' workspace and Docker images live here.
 
+  BlackberrySecurityGroupId:
+    Type: String
+    Default: ""
+    Description: Optional. The blackberry instance's security group (its InstanceSecurityGroupId output). When set, this stack adds rules to it that let the agent instance reach Mattermost (8065) and Vikunja (3456).
+
+Conditions:
+  HasBlackberry: !Not [!Equals [!Ref BlackberrySecurityGroupId, ""]]
+
 Resources:
   InstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -29,6 +37,30 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${AWS::StackName}-instance
+
+  # Rules live in this stack so the blackberry stack's resources stay untouched. They are removed
+  # when this stack is deleted.
+  BlackberryMattermostIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: HasBlackberry
+    Properties:
+      GroupId: !Ref BlackberrySecurityGroupId
+      IpProtocol: tcp
+      FromPort: 8065
+      ToPort: 8065
+      SourceSecurityGroupId: !Ref InstanceSecurityGroup
+      Description: Agent team to Mattermost
+
+  BlackberryVikunjaIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: HasBlackberry
+    Properties:
+      GroupId: !Ref BlackberrySecurityGroupId
+      IpProtocol: tcp
+      FromPort: 3456
+      ToPort: 3456
+      SourceSecurityGroupId: !Ref InstanceSecurityGroup
+      Description: Agent team to Vikunja
 
   InstanceRole:
     Type: AWS::IAM::Role
@@ -76,3 +108,7 @@ Outputs:
   InstanceId:
     Value: !Ref Instance
     Description: Connect with `aws ssm start-session --target <id>`.
+  InstanceSecurityGroupId:
+    Value: !Ref InstanceSecurityGroup
+  PrivateIp:
+    Value: !GetAtt Instance.PrivateIp

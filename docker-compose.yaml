@@ -30,8 +30,6 @@ services:
       BACKEND_URL: http://opencode-backend:4096
       FRONTEND_URL: http://opencode-frontend:4096
       AWS_ARCHITECT_URL: http://opencode-aws-architect:4096
-      # vikunja tool reaches Vikunja through the SSM port forward on the host (ssh-ec2.sh --forward vikunja)
-      VIKUNJA_URL: http://host.docker.internal:3456
     volumes:
       - ./workspace:/workspace
       - ./opencode.json:/workspace/opencode.json:ro
@@ -98,7 +96,6 @@ services:
     env_file: .env
     working_dir: /app
     environment:
-      MATTERMOST_URL: http://host.docker.internal:8065
       OPENCODE_URL: http://opencode-cto:4096
     extra_hosts:
       - "host.docker.internal:host-gateway"

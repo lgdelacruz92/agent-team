@@ -8,6 +8,9 @@
 #   SUBNET_ID               existing public subnet for the instance
 # Optional env vars:
 #   STACK_NAME (agent-team), INSTANCE_TYPE (t3.large), VOLUME_SIZE_GIB (50)
+#   BLACKBERRY_STACK_NAME (blackberry)   stack whose InstanceSecurityGroupId output is used to let the
+#                                        agent instance reach Mattermost and Vikunja
+#   BLACKBERRY_SECURITY_GROUP_ID         use this security group instead of looking it up
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -28,6 +31,21 @@ overrides=(
 [[ -n "${VOLUME_SIZE_GIB:-}" ]] && overrides+=("VolumeSizeGiB=$VOLUME_SIZE_GIB")
 
 aws_args=(--profile "$AWS_PROFILE" --region "$AWS_REGION")
+
+# Let the agent instance reach Mattermost and Vikunja on the blackberry instance.
+blackberry_sg="${BLACKBERRY_SECURITY_GROUP_ID:-}"
+if [[ -z "$blackberry_sg" ]]; then
+  blackberry_sg=$(aws "${aws_args[@]}" cloudformation describe-stacks \
+    --stack-name "${BLACKBERRY_STACK_NAME:-blackberry}" \
+    --query 'Stacks[0].Outputs[?OutputKey==`InstanceSecurityGroupId`].OutputValue' \
+    --output text 2>/dev/null || true)
+fi
+if [[ -n "$blackberry_sg" && "$blackberry_sg" != "None" ]]; then
+  overrides+=("BlackberrySecurityGroupId=$blackberry_sg")
+  echo "Allowing the agent instance to reach Mattermost and Vikunja via $blackberry_sg"
+else
+  echo "No blackberry security group found (deploy the blackberry stack first, or set BLACKBERRY_SECURITY_GROUP_ID); skipping the rules." >&2
+fi
 
 echo "Profile: $AWS_PROFILE  Region: $AWS_REGION"
 aws "${aws_args[@]}" sts get-caller-identity --query '[Account,Arn]' --output text
