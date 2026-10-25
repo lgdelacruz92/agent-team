@@ -2,7 +2,6 @@
 x-opencode: &opencode
   image: ghcr.io/anomalyco/opencode:latest
   restart: unless-stopped
-  platform: linux/amd64
   env_file: .env
   working_dir: /workspace
   networks:
