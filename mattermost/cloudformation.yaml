@@ -5,12 +5,9 @@ Parameters:
   VpcId:
     Type: AWS::EC2::VPC::Id
     Description: Existing VPC to deploy into.
-  InstanceSubnetId:
-    Type: AWS::EC2::Subnet::Id
-    Description: Public subnet for the EC2 instance (must auto-assign or route to an internet gateway).
-  LoadBalancerSubnetIds:
+  PublicSubnetIds:
     Type: List<AWS::EC2::Subnet::Id>
-    Description: Public subnets for the load balancer. At least two, in different Availability Zones.
+    Description: Existing public subnets, at least two in different Availability Zones. The load balancer spans all of them; the instance is placed in the first.
   InstanceType:
     Type: String
     Default: t3.medium
@@ -99,7 +96,7 @@ Resources:
       IamInstanceProfile: !Ref InstanceProfile
       NetworkInterfaces:
         - DeviceIndex: "0"
-          SubnetId: !Ref InstanceSubnetId
+          SubnetId: !Select [0, !Ref PublicSubnetIds]
           AssociatePublicIpAddress: true
           GroupSet:
             - !Ref InstanceSecurityGroup
@@ -118,7 +115,7 @@ Resources:
     Properties:
       Type: application
       Scheme: internet-facing
-      Subnets: !Ref LoadBalancerSubnetIds
+      Subnets: !Ref PublicSubnetIds
       SecurityGroups:
         - !Ref LoadBalancerSecurityGroup
 

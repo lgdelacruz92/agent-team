@@ -6,3 +6,6 @@ answer.md
 !**/*/package.json
 !agents/*.md
 .env
+
+node_modules/
+*.out
