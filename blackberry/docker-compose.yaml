@@ -30,6 +30,17 @@ services:
       mattermost-db:
         condition: service_healthy
 
+  # Docker creates named volumes owned by root, but vikunja runs as uid 1000. This one-shot
+  # container hands the volume to that user before vikunja starts.
+  vikunja-init:
+    image: busybox:stable
+    container_name: vikunja-init
+    platform: linux/amd64
+    user: "0:0"
+    command: chown -R 1000:0 /app/vikunja/files
+    volumes:
+      - vikunja-files:/app/vikunja/files
+
   # Task boards. Uses SQLite in its own volume, so it adds no load to mattermost-db.
   vikunja:
     image: vikunja/vikunja:latest
@@ -41,6 +52,9 @@ services:
     env_file: .env
     volumes:
       - vikunja-files:/app/vikunja/files
+    depends_on:
+      vikunja-init:
+        condition: service_completed_successfully
 
 volumes:
   mattermost-db-data:
