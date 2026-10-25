@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+source .env
+docker compose up --build -d
