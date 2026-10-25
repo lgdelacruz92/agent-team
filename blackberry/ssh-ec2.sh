@@ -12,7 +12,7 @@
 set -euo pipefail
 
 AWS_PROFILE='uk'
-REGION='eu-west-2'
+AWS_REGION='eu-west-2'
 
 : "${AWS_PROFILE:?set AWS_PROFILE}"
 : "${AWS_REGION:?set AWS_REGION}"
