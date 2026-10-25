@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Agent team EC2 instance (OpenCode CTO and workers; software installed separately), reached through Session Manager, in an existing VPC.
+Description: Agent team EC2 instance, reached through Session Manager, in an existing VPC.
 
 Parameters:
   VpcId:

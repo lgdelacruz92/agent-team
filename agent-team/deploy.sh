@@ -12,6 +12,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+
 : "${AWS_PROFILE:?set AWS_PROFILE}"
 : "${AWS_REGION:?set AWS_REGION}"
 : "${VPC_ID:?set VPC_ID}"
