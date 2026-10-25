@@ -2,13 +2,10 @@
 x-opencode: &opencode
   image: ghcr.io/anomalyco/opencode:latest
   restart: unless-stopped
+  env_file: .env
   working_dir: /workspace
   networks:
     - shared
-
-x-opencode-env: &opencode-env
-  OPENCODE_SERVER_PASSWORD: ${OPENCODE_SERVER_PASSWORD:-password124}
-  OPENCODE_SERVER_USERNAME: opencode
 
 x-opencode-command: &opencode-command
   - serve
@@ -28,7 +25,6 @@ services:
     ports:
       - "127.0.0.1:4096:4096"
     environment:
-      <<: *opencode-env
       OPENCODE_CONFIG_CONTENT: '{"default_agent":"planner"}'
       # delegate tool reaches the workers over the shared network
       BACKEND_URL: http://opencode-backend:4096
@@ -52,7 +48,6 @@ services:
     ports:
       - "127.0.0.1:4097:4096"
     environment:
-      <<: *opencode-env
       OPENCODE_CONFIG_CONTENT: '{"default_agent":"backend"}'
     volumes:
       - ./workspace:/workspace
@@ -67,7 +62,6 @@ services:
     ports:
       - "127.0.0.1:4098:4096"
     environment:
-      <<: *opencode-env
       OPENCODE_CONFIG_CONTENT: '{"default_agent":"frontend"}'
     volumes:
       - ./workspace:/workspace
@@ -82,9 +76,7 @@ services:
     ports:
       - "127.0.0.1:4099:4096"
     environment:
-      <<: *opencode-env
       OPENCODE_CONFIG_CONTENT: '{"default_agent":"aws-solutions-architect"}'
-      AWS_REGION: ${AWS_REGION:-us-east-1}
     volumes:
       - ./workspace:/workspace
       - ./opencode.json:/workspace/opencode.json:ro
@@ -92,11 +84,49 @@ services:
       - aws-architect-data:/root/.local/share/opencode
     command: *opencode-command
 
+  mattermost-db:
+    image: postgres:16-alpine
+    container_name: mattermost-db
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - mattermost-db-data:/var/lib/postgresql/data
+    networks:
+      - shared
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mattermost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mattermost:
+    image: mattermost/mattermost-team-edition:latest
+    container_name: mattermost
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8065:8065"
+    env_file: .env
+    volumes:
+      - mattermost-config:/mattermost/config
+      - mattermost-data:/mattermost/data
+      - mattermost-logs:/mattermost/logs
+      - mattermost-plugins:/mattermost/plugins
+    networks:
+      - shared
+    depends_on:
+      mattermost-db:
+        condition: service_healthy
+
 volumes:
   planner-data:
   backend-data:
   frontend-data:
   aws-architect-data:
+  mattermost-db-data:
+  mattermost-config:
+  mattermost-data:
+  mattermost-logs:
+  mattermost-plugins:
 
 networks:
   shared:

@@ -5,3 +5,4 @@ answer.md
 *.json
 !**/*/package.json
 !agents/*.md
+.env
