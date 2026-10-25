@@ -19,14 +19,14 @@ x-opencode-command: &opencode-command
   - DEBUG
 
 services:
-  # You talk to this one. It plans the work and delegates to backend, frontend and aws-architect.
-  planner:
+  # You talk to this one. The CTO plans the work and delegates to the backend, frontend and aws-architect team members.
+  cto:
     <<: *opencode
-    container_name: opencode-planner
+    container_name: opencode-cto
     ports:
       - "127.0.0.1:4096:4096"
     environment:
-      OPENCODE_CONFIG_CONTENT: '{"default_agent":"planner"}'
+      OPENCODE_CONFIG_CONTENT: '{"default_agent":"cto"}'
       # delegate tool reaches the workers over the shared network
       BACKEND_URL: http://opencode-backend:4096
       FRONTEND_URL: http://opencode-frontend:4096
@@ -34,9 +34,9 @@ services:
     volumes:
       - ./workspace:/workspace
       - ./opencode.json:/workspace/opencode.json:ro
-      - ./agents/planner.md:/root/.config/opencode/agents/planner.md:ro
+      - ./agents/cto.md:/root/.config/opencode/agents/cto.md:ro
       - ./tools/delegate.ts:/root/.config/opencode/tools/delegate.ts:ro
-      - planner-data:/root/.local/share/opencode
+      - cto-data:/root/.local/share/opencode
     depends_on:
       - backend
       - frontend
@@ -86,7 +86,7 @@ services:
     command: *opencode-command
 
 volumes:
-  planner-data:
+  cto-data:
   backend-data:
   frontend-data:
   aws-architect-data:
