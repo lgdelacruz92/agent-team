@@ -30,9 +30,22 @@ services:
       mattermost-db:
         condition: service_healthy
 
+  # Task boards. Uses SQLite in its own volume, so it adds no load to mattermost-db.
+  vikunja:
+    image: vikunja/vikunja:latest
+    container_name: vikunja
+    platform: linux/amd64
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3456:3456"
+    env_file: .env
+    volumes:
+      - vikunja-files:/app/vikunja/files
+
 volumes:
   mattermost-db-data:
   mattermost-config:
   mattermost-data:
   mattermost-logs:
   mattermost-plugins:
+  vikunja-files:
