@@ -1,10 +1,7 @@
 tests/test.json
-answer.md
 **/*/*.json
-*.md
 *.json
 !**/*/package.json
-!agents/*.md
 .env
 
 node_modules/
