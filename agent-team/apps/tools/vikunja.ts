@@ -25,16 +25,29 @@ const brief = (t: any) => ({
   due_date: t.due_date?.startsWith("0001") ? null : t.due_date,
   priority: t.priority,
   project_id: t.project_id,
+  labels: (t.labels ?? []).map((l: any) => l.title),
 })
 
 export default tool({
   description:
     "Track work in Vikunja. Actions: list_projects; list_tasks (optional projectId, optional filter such as 'done = false'); " +
     "create_task (needs projectId and title); update_task (needs taskId, change any of title, description, dueDate, priority); " +
-    "complete_task and reopen_task (need taskId). There is no delete.",
+    "complete_task and reopen_task (need taskId); add_label and remove_label (need taskId and label, e.g. the states 'ready', 'assigned', 'in-progress', 'review', 'retry', 'completed', or a worker name); " +
+    "add_comment (needs taskId and comment) and list_comments (needs taskId). list_tasks can also take label to keep only tasks carrying it. There is no delete.",
   args: {
     action: tool.schema
-      .enum(["list_projects", "list_tasks", "create_task", "update_task", "complete_task", "reopen_task"])
+      .enum([
+        "list_projects",
+        "list_tasks",
+        "create_task",
+        "update_task",
+        "complete_task",
+        "reopen_task",
+        "add_label",
+        "remove_label",
+        "add_comment",
+        "list_comments",
+      ])
       .describe("What to do"),
     projectId: tool.schema.number().optional().describe("Vikunja project ID (create_task, list_tasks)"),
     taskId: tool.schema.number().optional().describe("Vikunja task ID (update_task, complete_task, reopen_task)"),
@@ -43,9 +56,11 @@ export default tool({
     dueDate: tool.schema.string().optional().describe("ISO 8601 date-time, e.g. 2026-11-01T17:00:00Z"),
     priority: tool.schema.number().int().min(0).max(5).optional().describe("0 unset, 1 low ... 5 do now"),
     filter: tool.schema.string().optional().describe("Vikunja filter for list_tasks, e.g. 'done = false'"),
+    label: tool.schema.string().optional().describe("Label title (add_label, remove_label, list_tasks)"),
+    comment: tool.schema.string().optional().describe("Comment text (add_comment)"),
   },
-  async execute({ action, projectId, taskId, title, description, dueDate, priority, filter }) {
-    if (!TOKEN) return "Vikunja failed: VIKUNJA_API_TOKEN is not set in the cto container."
+  async execute({ action, projectId, taskId, title, description, dueDate, priority, filter, label, comment }) {
+    if (!TOKEN) return "Vikunja failed: VIKUNJA_API_TOKEN is not set in the container."
     try {
       switch (action) {
         case "list_projects": {
@@ -56,7 +71,8 @@ export default tool({
           const params = new URLSearchParams({ per_page: "50" })
           if (filter) params.set("filter", filter)
           const path = projectId ? `/projects/${projectId}/tasks` : "/tasks"
-          return JSON.stringify((await call("GET", `${path}?${params}`)).map(brief), null, 2)
+          const tasks = (await call("GET", `${path}?${params}`)).map(brief)
+          return JSON.stringify(label ? tasks.filter((t: any) => t.labels.includes(label)) : tasks, null, 2)
         }
         case "create_task": {
           if (!projectId || !title) return "create_task needs projectId and title."
@@ -67,6 +83,29 @@ export default tool({
             priority,
           })
           return JSON.stringify(brief(created), null, 2)
+        }
+        case "add_label":
+        case "remove_label": {
+          if (!taskId || !label) return `${action} needs taskId and label.`
+          const labels = (await call("GET", "/labels?per_page=200")) ?? []
+          let found = labels.find((l: any) => l.title === label)
+          if (action === "remove_label") {
+            if (found) await call("DELETE", `/tasks/${taskId}/labels/${found.id}`)
+          } else {
+            found ??= await call("PUT", "/labels", { title: label })
+            await call("PUT", `/tasks/${taskId}/labels`, { label_id: found.id })
+          }
+          return JSON.stringify(brief(await call("GET", `/tasks/${taskId}`)), null, 2)
+        }
+        case "add_comment": {
+          if (!taskId || !comment) return "add_comment needs taskId and comment."
+          await call("PUT", `/tasks/${taskId}/comments`, { comment })
+          return "Comment added."
+        }
+        case "list_comments": {
+          if (!taskId) return "list_comments needs taskId."
+          const comments = (await call("GET", `/tasks/${taskId}/comments`)) ?? []
+          return JSON.stringify(comments.map((c: any) => ({ author: c.author?.username, created: c.created, comment: c.comment })), null, 2)
         }
         default: {
           if (!taskId) return `${action} needs taskId.`
