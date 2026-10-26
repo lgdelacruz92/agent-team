@@ -2,7 +2,7 @@
 x-opencode: &opencode
   image: ghcr.io/anomalyco/opencode:latest
   restart: unless-stopped
-  env_file: .env
+  env_file: ${ENV_FILE:-.env}
   working_dir: /workspace
   networks:
     - shared
@@ -39,10 +39,6 @@ services:
       - cto-data:/root/.local/share/opencode
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    depends_on:
-      - backend
-      - frontend
-      - aws-architect
     command: *opencode-command
 
   backend:
@@ -93,7 +89,7 @@ services:
     build: ./bridge
     container_name: opencode-bridge
     restart: unless-stopped
-    env_file: .env
+    env_file: ${ENV_FILE:-.env}
     working_dir: /app
     environment:
       OPENCODE_URL: http://opencode-cto:4096

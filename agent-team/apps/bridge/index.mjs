@@ -33,6 +33,7 @@ import express from "express"
 import { parseAllowed, splitMessage, stripMention, stripPrefix } from "./lib.mjs"
 
 const MM_URL = (process.env.MATTERMOST_URL ?? "http://host.docker.internal:8065").replace(/\/$/, "")
+console.log(MM_URL)
 const MM_TOKEN = process.env.MATTERMOST_BOT_TOKEN ?? ""
 const ALLOWED = parseAllowed(process.env.MATTERMOST_ALLOWED_USERS)
 const OC_URL = (process.env.OPENCODE_URL ?? "http://opencode-cto:4096").replace(/\/$/, "")

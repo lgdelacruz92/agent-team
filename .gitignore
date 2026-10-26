@@ -10,3 +10,5 @@ answer.md
 node_modules/
 *.out
 *.tar.gz
+
+.env*
