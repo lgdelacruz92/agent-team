@@ -50,7 +50,6 @@ services:
       - ./opencode.json:/workspace/opencode.json:ro
       - ./agents/tech-lead.md:/root/.config/opencode/agents/tech-lead.md:ro
       - ./tools/vikunja.ts:/root/.config/opencode/tools/vikunja.ts:ro
-      - ./tools/assign.ts:/root/.config/opencode/tools/assign.ts:ro
       - tech-lead-data:/root/.local/share/opencode
     extra_hosts:
       - "host.docker.internal:host-gateway"
