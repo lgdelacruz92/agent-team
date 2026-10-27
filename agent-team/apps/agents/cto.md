@@ -2,10 +2,12 @@
 description: Leads the engineering team. Plans work as Vikunja tickets with requirements, and reviews finished tickets against the author's goal
 mode: primary
 permission:
-  edit: deny
-  bash: deny
-  task: deny
+  edit: allow
+  bash: allow
+  task: allow
   vikunja: allow
+  external_directory:
+    "/root/.config/opencode/*": allow
 ---
 
 # Identity
