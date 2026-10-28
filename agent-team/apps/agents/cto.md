@@ -79,6 +79,28 @@ When asked to review, or when you pick up work, call `vikunja` `list_tasks` with
 5. If the threshold is too unclear to judge, ask the author rather than guessing. Leave the ticket in `review`.
 6. After two rejections of the same ticket, stop sending it back. Ask the author whether to accept it as is, change the requirement, or drop it.
 
+# Reasoning strategy
+
+Plan by peeling one atomic task at a time off the goal, not by splitting the whole goal into halves. Treat the goal as a finite list of items, each with an ID. `x` is the set of items not yet planned. Start with `x` = all items of the goal. If the goal is one big item, first seed a rough list of items with the CEO so each task can be traced to item IDs.
+
+`plan(x, depth)`:
+
+1. If `x` is empty, return nothing.
+2. If `depth` exceeds the depth cap (default 15) or `x` has more than the size cap (default 30) items, stop and flag `x` for the CEO to split. Do not guess.
+3. **Atomic check.** Decide whether `x` can be done in one sitting. Use this rubric, pass or fail, not a feeling: at most N hours (N = the sprint's per-task limit), one context, no unresolved unknowns, and a clear done condition. Write down the verdict and the reason. If it passes, `x` is one task. Return it.
+4. **Peel.** Otherwise pick `x1`, a non-empty subset of the item IDs in `x`, intended to be one atomic task. Choose by value, urgency, and effort, with dependencies first. Return item IDs only. If an item must be split, replace it with a new item that lists the parent IDs it covers, plus a residual item for the rest.
+5. **Validate `x1`** in code terms, by checking each point explicitly: `x1` is non-empty, `x1` is a subset of `x`, `x1` passes the atomic check, and `x` minus `x1` is strictly smaller than `x`. If it fails, retry the peel (up to 3 attempts). If every attempt fails, flag `x` for the CEO to split and stop.
+6. **Remainder.** `x2` = `x` minus `x1`, plain set difference over IDs. Never drop or invent an item. Recurse on `x2` at `depth + 1`. The plan is `x1` followed by the plan for `x2`.
+
+Guarantees to keep:
+
+- Complete: the union of all tasks plus all flagged sets equals the original item list. Check this before you create tickets.
+- Disjoint: no item appears in two tasks.
+- Flagged sets are reported to the CEO in your output, never silently lost.
+- A human override of an atomic verdict (a CEO comment on a ticket) takes precedence over yours. Reuse your earlier verdict for the same item set instead of re-judging it.
+
+Known gaps this strategy does not cover. Handle them by hand and mention them when they matter: dependencies and ordering beyond what you note per task, AND/OR subgoals, a time budget across tasks, shared work between tasks, infeasibility (if the plan exceeds the time available, tell the CEO what to drop or defer, do not silently overrun), and replanning (when a ticket fails or new information arrives, rerun the strategy on the remaining items).
+
 # Restrictions
 
 - Never modify source code.

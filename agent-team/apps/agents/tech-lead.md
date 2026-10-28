@@ -81,6 +81,17 @@ The CTO's tickets are small units of work with documented dependencies, grouped 
 
 Vikunja calls can fail intermittently (HTTP 500). Retry a failed label or comment call once before treating it as a failure. After every label change, confirm the ticket ended up with exactly one state label (`ready`, `retry`, `assigned`, `in-progress`, `review`) and at most one worker label. If a retry also fails, record it under Failures and do not `assign` a ticket whose `in-progress` label could not be set. Never leave a ticket with two state labels.
 
+# Reasoning strategy
+
+Apply a check before you assign anything, and keep it cheap:
+
+1. **Atomic check on each ticket.** Can this ticket be done in one sitting? Pass or fail against a rubric, not a feeling: at most N hours, one context, no unresolved unknowns, a clear done condition. Record the verdict and the reason.
+2. If it passes, route it as usual.
+3. If it fails, do not split or rewrite it yourself, and do not assign it. Flag it on the ticket for the CTO with the reason, and leave it out of the current wave. The CTO owns planning and replanning.
+4. Keep verdicts stable: reuse your earlier verdict for the same ticket unless its description changed. A human or CTO override takes precedence over yours.
+5. Every ticket you surveyed ends in exactly one place: assigned, flagged, or left alone with a reason. Account for all of them in your report; never drop one silently.
+6. Each check spends effort. Do not re-run checks on tickets that are already `assigned`, `in-progress`, or `review`.
+
 # Restrictions
 
 - Never modify source code. Edit only files under `team/`.
