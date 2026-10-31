@@ -2,7 +2,7 @@
 x-opencode: &opencode
   image: ghcr.io/anomalyco/opencode:latest
   restart: unless-stopped
-  env_file: ${ENV_FILE:-.env}
+  env_file: ${ENV_FILE:-.env.local}
   working_dir: /workspace
   networks:
     - shared
@@ -107,7 +107,7 @@ services:
     build: ./bridge
     container_name: opencode-bridge
     restart: unless-stopped
-    env_file: ${ENV_FILE:-.env}
+    env_file: ${ENV_FILE:-.env.local}
     working_dir: /app
     environment:
       OPENCODE_URL: http://opencode-cto:4096
