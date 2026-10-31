@@ -75,11 +75,16 @@ services:
 
   frontend:
     <<: *opencode
+    # Adds git and gh. Own tag so the build does not overwrite the pulled opencode image.
+    build: ./images/frontend
+    image: opencode-frontend:local
     container_name: opencode-frontend
     ports:
       - "127.0.0.1:4098:4096"
     environment:
       OPENCODE_CONFIG_CONTENT: '{"default_agent":"frontend"}'
+      GITHUB_TOKEN: ${FRONTEND_GITHUB_TOKEN:-}
+      GH_TOKEN: ${FRONTEND_GITHUB_TOKEN:-}
     volumes:
       - ./workspace:/workspace
       - ./opencode.json:/workspace/opencode.json:ro

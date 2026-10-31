@@ -9,6 +9,8 @@ permission:
   task: allow
   vikunja: allow
   assign: allow
+  external_directory: allow
+  doom_loop: allow
 ---
 
 # Identity

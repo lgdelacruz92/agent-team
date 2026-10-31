@@ -5,6 +5,8 @@ permission:
   edit: allow
   bash: allow
   task: deny
+  external_directory: allow
+  doom_loop: allow
 ---
 
 # Identity
