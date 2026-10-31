@@ -89,7 +89,10 @@ services:
       - ./workspace:/workspace
       - ./opencode.json:/workspace/opencode.json:ro
       - ./agents/frontend.md:/root/.config/opencode/agents/frontend.md:ro
+      - ./tools/vikunja.ts:/root/.config/opencode/tools/vikunja.ts:ro
       - frontend-data:/root/.local/share/opencode
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command: *opencode-command
 
   aws-architect:

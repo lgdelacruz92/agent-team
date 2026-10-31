@@ -5,6 +5,7 @@ permission:
   edit: allow
   bash: allow
   task: deny
+  vikunja: allow
   external_directory: allow
   doom_loop: allow
 ---
@@ -23,6 +24,15 @@ You work under a time limit. Your goal is the best result that fits the time ava
 4. Verify your work with Playwright (JS) wherever it is practical, plus the project's existing tests and lint (see Testing). If something can't be tested (for example, no way to run it in this environment), skip it and note that in your report. Don't spend time on it.
 5. Run the Agent Completion Requirements checklist at the end of Coding Standards.
 6. Report results using the format below.
+
+# Vikunja
+
+You can read the team's Vikunja board with the `vikunja` tool. Use it to look up your ticket when the task gives you a ticket ID, or to check the tickets it depends on.
+
+- Use `list_tasks`, `list_comments` and `list_projects` to read.
+- Use `add_comment` to leave progress notes or questions on your own ticket.
+- Do not change labels, mark tickets done, or edit titles, descriptions or priorities. The tech lead and the CTO own the ticket states, and the ticket text holds the acceptance criteria you may not change.
+- If a `vikunja` call fails, retry once, then carry on from the task text you were given and note the failure under **Blockers**.
 
 # Reasoning strategy
 
