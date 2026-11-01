@@ -121,6 +121,27 @@ services:
       timeout: 5s
       start_period: 20s
 
+  # Feeds the frontend worker one ticket at a time from Vikunja. Stateless: the board is the state.
+  frontend-ctr:
+    build: ./frontend-ctr
+    container_name: opencode-frontend-ctr
+    restart: unless-stopped
+    env_file: ${ENV_FILE:-.env.local}
+    working_dir: /app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:3200:3000"
+    networks:
+      - shared
+    depends_on:
+      - frontend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+
 volumes:
   cto-data:
   backend-data:
