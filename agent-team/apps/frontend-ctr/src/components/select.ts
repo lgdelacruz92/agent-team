@@ -1,8 +1,8 @@
 // Pure: pick the next ticket from board data. No I/O.
 import type { Selection, Skipped, Ticket } from "../interfaces/ticket.js"
 
-// True when the description contains acceptance criteria.
-export const hasAcceptanceCriteria = (description: string): boolean => /acceptance criteria/i.test(description)
+// True when the description has an "Acceptance criteria" (or "Acceptance checklist") section.
+export const hasAcceptanceCriteria = (description: string): boolean => /acceptance (criteria|checklist)/i.test(description)
 
 // Why a ticket cannot be handed to the worker, or null when it is ready.
 export function gateProblem(ticket: Ticket): string | null {

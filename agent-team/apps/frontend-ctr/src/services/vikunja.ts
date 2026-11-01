@@ -1,5 +1,6 @@
 // REST client for Vikunja: tasks, relations, Kanban status, comments.
 import { config } from "../config.js"
+import { htmlToText } from "../components/text.js"
 import type { Board, Comment } from "../interfaces/vikunja.js"
 import type { Status, Ticket } from "../interfaces/ticket.js"
 
@@ -57,7 +58,8 @@ function write<T>(method: string, path: string, body?: unknown): Promise<T> {
   return next as Promise<T>
 }
 
-// Maps a lowercase bucket title to its status.
+// Maps a lowercase bucket title to its status. Only the five columns in config.buckets carry a status;
+// any other column (To-Do, Doing, Archived, ...) is ignored, and tickets in it are never started.
 function statusByTitle(): Map<string, Status> {
   const map = new Map<string, Status>()
 
@@ -169,7 +171,7 @@ export async function listTickets(board: Board): Promise<Ticket[]> {
     tickets.push({
       id: task.id,
       title: task.title,
-      description: task.description ?? "",
+      description: htmlToText(task.description ?? ""),
       dueDate: dueOf(task),
       status: board.statusOf.get(task.id) ?? null,
       goal: goalOf(task),
@@ -182,30 +184,12 @@ export async function listTickets(board: Board): Promise<Ticket[]> {
   return tickets
 }
 
-// Vikunja's editor stores comments as HTML; the markers are matched on plain text.
-function stripHtml(text: string): string {
-  if (!/<\/?(p|br|div)\b/i.test(text)) {
-    return text
-  }
-
-  return text
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/p>\s*<p>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .trim()
-}
-
 // Comments of a ticket in plain text, oldest first.
 export async function listComments(taskId: number): Promise<Comment[]> {
   const comments: any[] = (await call("GET", `/tasks/${taskId}/comments`)) ?? []
 
   return comments
-    .map((c) => ({ id: c.id, created: c.created, comment: stripHtml(c.comment ?? "") }))
+    .map((c) => ({ id: c.id, created: c.created, comment: htmlToText(c.comment ?? "") }))
     .sort((a, b) => a.id - b.id)
 }
 
