@@ -4,6 +4,7 @@ mode: primary
 permission:
   edit: allow
   bash: allow
+  compact: allow
   task: deny
   external_directory: allow
   doom_loop: allow

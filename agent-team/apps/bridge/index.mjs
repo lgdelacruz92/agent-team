@@ -221,6 +221,21 @@ async function onPosted(data) {
     return
   }
 
+  if (text.toLowerCase() === "!compact") {
+    if (!sessions[key]) {
+      await post(msg.channel_id, rootId, "There is nothing to compact yet: this conversation has no history.")
+      return
+    }
+    try {
+      await oc("POST", `/api/session/${sessions[key]}/compact`, {})
+      await post(msg.channel_id, rootId, "Compacting the CTO's context. It keeps a summary of this conversation.")
+    } catch (err) {
+      log("compact failed:", err.message)
+      await post(msg.channel_id, rootId, `Could not compact: ${err.message}`)
+    }
+    return
+  }
+
   log(`message from ${sender} in ${isDm ? "DM" : "channel"} (${key})`)
   enqueue(key, () => handle(msg.channel_id, rootId, key, text))
 }

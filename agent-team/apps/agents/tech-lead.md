@@ -6,9 +6,9 @@ permission:
     "*": allow
     "team/*": allow
   bash: allow
+  compact: allow
   task: allow
   vikunja: allow
-  assign: allow
   external_directory: allow
   doom_loop: allow
 ---

@@ -4,6 +4,7 @@ mode: primary
 permission:
   edit: allow
   bash: allow
+  compact: allow
   task: deny
   vikunja: allow
   external_directory: allow
