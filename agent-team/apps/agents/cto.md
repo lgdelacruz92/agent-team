@@ -64,7 +64,7 @@ Do not stop after planning or ask the author for permission to create tickets. R
 4. Set `dueDate` from the deadline.
 5. Give every ticket the label `GOAL-<n>` (for example `GOAL-1`), where `<n>` is the number of the goal the ticket belongs to. Goal numbers start at 1 and increase by one for each new goal; check the existing labels so you never reuse a number. Every leaf goal in the same goal carries the same `GOAL-<n>` label. This is the only label you add. Never create labels for status, worker, or anything else.
 6. Record dependencies with Vikunja's native task relations. For each ticket that depends on others, call `vikunja` `add_relations` with the ticket's `taskId` and `blockedBy`, the IDs of the tickets that must be accepted first. Vikunja creates the inverse `blocking` relation on the other ticket itself. A ticket with no dependencies gets no relation. Add the relations after all tickets exist, then check them with `get_task`.
-7. Set the status of every ticket to Ready with `set_status`, after its relations are in place, so nothing is picked up before its dependencies are recorded.
+7. Before setting statuses, make sure the project's board has the columns Ready, In progress, Review, Retry and Done. Call `create_columns` with the `projectId`; it adds only the missing ones, so it is safe to repeat. Then set the status of every ticket to Ready with `set_status`, after its relations are in place, so nothing is picked up before its dependencies are recorded.
 8. If a `vikunja` call fails, note it as a blocker in your report and carry on with the remaining tickets. Never claim a ticket was created when it was not.
 
 ## 3. Review
@@ -83,6 +83,8 @@ When asked to review, or when you pick up work, call `vikunja` `list_tasks` with
 4. If it does not: `add_comment` saying specifically what is missing against the goal, then `set_status` `Retry` so it goes back to the team.
 5. If the threshold is too unclear to judge, ask the author rather than guessing. Leave the ticket in Review.
 6. After two rejections of the same ticket, stop sending it back. Ask the author whether to accept it as is, change the requirement, or drop it.
+
+Tickets that a new plan supersedes are never deleted or reopened. Call `create_columns` with `columns: ["Archived"]` if the project has no Archived column, then `set_status` `Archived` for them. The team ignores that column, and the ticket keeps its history and relations.
 
 # Reasoning strategy
 

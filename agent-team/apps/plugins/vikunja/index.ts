@@ -12,7 +12,18 @@ const TIMEOUT_MS = Number(process.env.VIKUNJA_TIMEOUT_MS ?? 30 * 1000)
 // label, list_tasks only shows that goal, and tickets labeled for another goal are off limits.
 const SCOPED_AGENTS = (process.env.VIKUNJA_SCOPED_AGENTS ?? "cto").split(",").map((a) => a.trim())
 const GOAL_FILE = process.env.VIKUNJA_GOAL_FILE ?? "/root/.local/share/opencode/vikunja-goals.json"
-const GOAL_PREFIX = "goal:"
+const GOAL_PREFIX = "GOAL-"
+const isGoalLabel = (title: string) => /^GOAL-\d+$/i.test(title)
+// Kanban column titles, compared case-insensitively. Same names as the controller's config.
+const STATUSES: Record<string, string> = {
+  ready: "Ready",
+  "in-progress": "In progress",
+  review: "Review",
+  retry: "Retry",
+  done: "Done",
+  // Parking column for superseded tickets: the controller ignores it, so they are never picked up.
+  archived: "Archived",
+}
 // Vikunja answers HTTP 500 to concurrent writes in one project (3 of 4 parallel creates failed in testing),
 // so bulk actions write one ticket at a time. They still cost the model a single tool call.
 const CONCURRENCY = 1
@@ -40,6 +51,12 @@ const brief = (t: any) => ({
   priority: t.priority,
   project_id: t.project_id,
   labels: (t.labels ?? []).map((l: any) => l.title),
+  relations: Object.fromEntries(
+    Object.entries(t.related_tasks ?? {}).map(([kind, list]: [string, any]) => [
+      kind,
+      (list ?? []).map((r: any) => ({ id: r.id, title: r.title, done: r.done })),
+    ]),
+  ),
 })
 
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err))
@@ -74,8 +91,8 @@ function guard(context: any, task: any) {
   const goal = activeGoal(context)
   if (!goal) return
   const labels: string[] = (task.labels ?? []).map((l: any) => l.title)
-  const others = labels.filter((l) => l.startsWith(GOAL_PREFIX) && l !== goal)
-  if (others.length && !labels.includes(goal)) {
+  const others = labels.filter((l) => isGoalLabel(l) && l.toUpperCase() !== goal)
+  if (others.length && !labels.some((l) => l.toUpperCase() === goal)) {
     throw new Error(`task ${task.id} belongs to ${others.join(", ")}, not ${goal}. Call set_goal to switch goals.`)
   }
 }
@@ -111,6 +128,18 @@ async function ensureLabels(titles: string[]): Promise<Map<string, any>> {
   }
   return found
 }
+
+// The Kanban view and its columns for a project, with each column's title lowercased.
+async function loadKanban(projectId: number) {
+  const views: any[] = await call("GET", `/projects/${projectId}/views`)
+  const view = views.find((v) => v.view_kind === "kanban")
+  if (!view) throw new Error(`project ${projectId} has no Kanban view`)
+  const columns: any[] = await call("GET", `/projects/${projectId}/views/${view.id}/tasks?per_page=200`)
+  return { projectId, viewId: view.id as number, columns }
+}
+
+// Normalizes a status name such as "In progress" or "in-progress" to a STATUSES key.
+const statusKey = (status: string) => String(status ?? "").trim().toLowerCase().replace(/\s+/g, "-")
 
 async function listAll(path: string, params: URLSearchParams): Promise<any[]> {
   const tasks: any[] = []
@@ -151,20 +180,38 @@ async function updateOne(context: any, taskId: number, changes: any) {
 }
 
 async function run(input: any, context: any): Promise<string> {
-  const { action, projectId, taskId, title, description, dueDate, priority, filter, label, comment, goal, tasks, taskIds, add, remove } = input
+  const { action, projectId, taskId, title, description, dueDate, priority, filter, label, comment, goal, tasks, taskIds, add, remove, status, blockedBy, projectIds, columns } = input
   if (!TOKEN) return "Vikunja failed: VIKUNJA_API_TOKEN is not set in the container."
   try {
     switch (action) {
       case "set_goal": {
-        const slug = String(goal ?? "")
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-|-$/g, "")
-          .slice(0, 40)
-        if (!slug) return "set_goal needs goal, a short name for the goal you are planning."
-        goals[context.sessionID] = GOAL_PREFIX + slug
+        const n = /^(?:GOAL[-:\s]*)?(\d+)$/i.exec(String(goal ?? "").trim())?.[1]
+        if (!n || Number(n) < 1) return "set_goal needs goal, the goal number: 1, 2, 3 ... (or GOAL-1)."
+        const label = `${GOAL_PREFIX}${Number(n)}`
+        goals[context.sessionID] = label
         saveGoals()
-        return `Active goal: ${GOAL_PREFIX + slug}. New tickets get this label, and list_tasks shows only this goal's tickets.`
+        return `Active goal: ${label}. New tickets get this label, and list_tasks shows only this goal's tickets.`
+      }
+      case "list_goals": {
+        // Every GOAL-<n> label across all projects, so the next free number is easy to find.
+        const params = new URLSearchParams({ per_page: "50" })
+        const found = new Map<string, { goal: string; tasks: number; open: number; projects: Set<number> }>()
+        for (const t of await listAll("/tasks", params)) {
+          for (const l of t.labels ?? []) {
+            if (!isGoalLabel(l.title)) continue
+            const key = l.title.toUpperCase()
+            const entry = found.get(key) ?? { goal: key, tasks: 0, open: 0, projects: new Set<number>() }
+            entry.tasks++
+            if (!t.done) entry.open++
+            entry.projects.add(t.project_id)
+            found.set(key, entry)
+          }
+        }
+        const goalsFound = [...found.values()]
+          .map((g) => ({ ...g, projects: [...g.projects] }))
+          .sort((a, b) => Number(a.goal.slice(5)) - Number(b.goal.slice(5)))
+        const highest = goalsFound.reduce((m, g) => Math.max(m, Number(g.goal.slice(5))), 0)
+        return json({ goals: goalsFound, nextFreeNumber: highest + 1 })
       }
       case "list_projects": {
         const projects = await call("GET", "/projects")
@@ -181,13 +228,34 @@ async function run(input: any, context: any): Promise<string> {
         } else {
           found = (await call("GET", `${path}?${params}`)).map(brief)
         }
-        return json(label ? found.filter((t: any) => t.labels.includes(label)) : found)
+        if (label) found = found.filter((t: any) => t.labels.includes(label))
+        if (status) {
+          const title = STATUSES[statusKey(status)]
+          if (!title) return `list_tasks status must be one of: ${Object.values(STATUSES).join(", ")}.`
+          const projects = projectId ? [Number(projectId)] : [...new Set(found.map((t: any) => t.project_id))]
+          const inStatus = new Set<number>()
+          for (const id of projects) {
+            const { columns } = await loadKanban(id)
+            for (const c of columns) {
+              if (String(c.title).toLowerCase() === title.toLowerCase()) for (const t of c.tasks ?? []) inStatus.add(t.id)
+            }
+          }
+          found = found.filter((t: any) => inStatus.has(t.id))
+        }
+        return json(found)
       }
       case "get_task": {
         if (!taskId) return "get_task needs taskId."
         const task = await call("GET", `/tasks/${taskId}`)
         if (isScoped(context)) guard(context, task)
-        return json(brief(task))
+        // The Kanban column is the ticket's status; look it up so set_status can be verified.
+        let status: string | null = null
+        try {
+          const { columns } = await loadKanban(task.project_id)
+          const column = columns.find((c: any) => (c.tasks ?? []).some((t: any) => t.id === task.id))
+          status = column?.title ?? null
+        } catch {}
+        return json({ ...brief(task), status })
       }
       case "create_task": {
         const scope = activeGoal(context)
@@ -233,6 +301,63 @@ async function run(input: any, context: any): Promise<string> {
         const failed = results.filter((r: any) => r.error).length
         return json({ labeled: results.length - failed, failed, results })
       }
+      case "create_columns": {
+        // Adds the missing Kanban columns to each project's board. Existing columns are left alone.
+        const ids: number[] = Array.isArray(projectIds) && projectIds.length ? projectIds : projectId ? [projectId] : []
+        if (!ids.length) return "create_columns needs projectId or projectIds. Optional columns: titles to create, default Ready, In progress, Review, Retry, Done."
+        const wanted: string[] = Array.isArray(columns) && columns.length ? columns : ["Ready", "In progress", "Review", "Retry", "Done"]
+        const results = await pool(ids, async (id) => {
+          const board = await loadKanban(id)
+          const have = new Set(board.columns.map((c: any) => String(c.title).toLowerCase()))
+          const created: string[] = []
+          for (const title of wanted) {
+            if (have.has(title.toLowerCase())) continue
+            await call("PUT", `/projects/${id}/views/${board.viewId}/buckets`, { title })
+            have.add(title.toLowerCase())
+            created.push(title)
+          }
+          return { projectId: id, created, existing: board.columns.map((c: any) => c.title) }
+        })
+        const failed = results.filter((r: any) => r.error).length
+        return json({ projects: results.length - failed, failed, results })
+      }
+      case "set_status": {
+        if (!Array.isArray(taskIds) || !taskIds.length) return "set_status needs taskIds and status."
+        const title = STATUSES[statusKey(status)]
+        if (!title) return `set_status status must be one of: ${Object.values(STATUSES).join(", ")}.`
+        const boards = new Map<number, Awaited<ReturnType<typeof loadKanban>>>()
+        const results = await pool(taskIds, async (id) => {
+          const task = await call("GET", `/tasks/${id}`)
+          guard(context, task)
+          if (!boards.has(task.project_id)) boards.set(task.project_id, await loadKanban(task.project_id))
+          const board = boards.get(task.project_id)!
+          const column = board.columns.find((c: any) => String(c.title).toLowerCase() === title.toLowerCase())
+          if (!column) throw new Error(`project ${task.project_id} has no "${title}" column`)
+          await call("POST", `/projects/${board.projectId}/views/${board.viewId}/buckets/${column.id}/tasks`, {
+            task_id: id,
+            bucket_id: column.id,
+            project_view_id: board.viewId,
+            project_id: board.projectId,
+          })
+          // Vikunja's Done column marks the task done itself; keep the done flag in step for the other columns.
+          const wantDone = statusKey(status) === "done"
+          if (statusKey(status) !== "archived" && wantDone !== !!task.done) await call("POST", `/tasks/${id}`, { ...task, done: wantDone })
+          return { id, status: title }
+        })
+        const failed = results.filter((r: any) => r.error).length
+        return json({ updated: results.length - failed, failed, results })
+      }
+      case "add_relations": {
+        if (!taskId || !Array.isArray(blockedBy) || !blockedBy.length) return "add_relations needs taskId and blockedBy, the IDs of the tickets that must be accepted first."
+        guard(context, await call("GET", `/tasks/${taskId}`))
+        const results = await pool(blockedBy, async (other) => {
+          // "blocked" on this ticket: Vikunja adds the inverse "blocking" relation on the other one.
+          await call("PUT", `/tasks/${taskId}/relations`, { other_task_id: other, relation_kind: "blocked" })
+          return { id: other }
+        })
+        const failed = results.filter((r: any) => r.error).length
+        return json({ related: results.length - failed, failed, results })
+      }
       case "add_label":
       case "remove_label": {
         if (!taskId || !label) return `${action} needs taskId and label.`
@@ -275,6 +400,7 @@ async function run(input: any, context: any): Promise<string> {
 
 const ACTIONS = [
   "set_goal",
+  "list_goals",
   "list_projects",
   "list_tasks",
   "get_task",
@@ -287,6 +413,9 @@ const ACTIONS = [
   "add_label",
   "remove_label",
   "label_tasks",
+  "set_status",
+  "create_columns",
+  "add_relations",
   "add_comment",
   "list_comments",
 ]
@@ -298,10 +427,14 @@ export default Plugin.define({
       editor.add({
         name: "vikunja",
         description:
-          "Track work in Vikunja. Actions: set_goal (needs goal: a short name; scopes this session to one goal, call it first when planning); " +
-          "list_projects; list_tasks (optional projectId, optional filter such as 'done = false'; optional label to keep only tasks carrying it); get_task (needs taskId; returns one ticket with its description and labels); " +
+          "Track work in Vikunja. Actions: set_goal (needs goal: the goal number, e.g. 1; scopes this session to the label GOAL-1, call it first when planning); " +
+          "list_goals (every GOAL-<n> label across all projects with ticket counts, and the next free number); " +
+          "list_projects; list_tasks (optional projectId, optional filter such as 'done = false'; optional label to keep only tasks carrying it; optional status: Ready, In progress, Review, Retry or Done); get_task (needs taskId; returns one ticket with its description, labels, status (Kanban column) and relations: blocked = tickets that block it, blocking = tickets it blocks); " +
           "create_task (needs projectId and title); update_task (needs taskId, change any of title, description, dueDate, priority; dueDate 'none' clears it); " +
           "complete_task and reopen_task (need taskId); add_label and remove_label (need taskId and label, e.g. the states 'ready', 'assigned', 'in-progress', 'review', 'retry', 'completed', or a worker name); " +
+          "set_status (needs taskIds and status: Ready, In progress, Review, Retry, Done or Archived; moves the tickets to that Kanban column; Archived parks superseded tickets where the team never picks them up, it needs that column to exist); " +
+          "create_columns (needs projectId or projectIds; optional columns: titles, default Ready, In progress, Review, Retry, Done; adds only the missing Kanban columns, so it is safe to repeat; add 'Archived' to columns when you need it); " +
+          "add_relations (needs taskId and blockedBy: IDs of the tickets that must be accepted first; Vikunja adds the inverse 'blocking' relation itself); " +
           "add_comment (needs taskId and comment) and list_comments (needs taskId). " +
           "BULK, prefer these whenever you touch more than one ticket, they take one call instead of many: " +
           "create_tasks (needs tasks: [{projectId, title, description?, dueDate?, priority?, labels?}]); " +
@@ -311,8 +444,12 @@ export default Plugin.define({
           type: "object",
           properties: {
             action: { type: "string", enum: ACTIONS, description: "What to do" },
-            goal: { type: "string", description: "Short goal name (set_goal), e.g. 'todo web app'" },
-            projectId: { type: "number", description: "Vikunja project ID (create_task, list_tasks)" },
+            goal: { type: "string", description: "Goal number (set_goal), e.g. '1' or 'GOAL-1'" },
+            status: { type: "string", description: "Kanban status (set_status, list_tasks): Ready, In progress, Review, Retry or Done" },
+            blockedBy: { type: "array", items: { type: "number" }, description: "IDs of the tickets that block taskId (add_relations)" },
+            projectId: { type: "number", description: "Vikunja project ID (create_task, list_tasks, create_columns)" },
+            projectIds: { type: "array", items: { type: "number" }, description: "Project IDs (create_columns)" },
+            columns: { type: "array", items: { type: "string" }, description: "Kanban column titles to create (create_columns)" },
             taskId: { type: "number", description: "Vikunja task ID (update_task, complete_task, reopen_task, labels, comments)" },
             title: { type: "string", description: "Task title" },
             description: { type: "string", description: "Task description, e.g. the acceptance criteria and assigned team member" },
@@ -339,7 +476,7 @@ export default Plugin.define({
                 additionalProperties: false,
               },
             },
-            taskIds: { type: "array", items: { type: "number" }, description: "Ticket IDs for label_tasks" },
+            taskIds: { type: "array", items: { type: "number" }, description: "Ticket IDs for label_tasks and set_status" },
             add: { type: "array", items: { type: "string" }, description: "Label titles to add (label_tasks)" },
             remove: { type: "array", items: { type: "string" }, description: "Label titles to remove (label_tasks)" },
           },
