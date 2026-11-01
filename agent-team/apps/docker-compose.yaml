@@ -1,7 +1,12 @@
 
 x-opencode: &opencode
-  image: ghcr.io/anomalyco/opencode:latest
+  # Adds bash and curl. Own tag so the build does not overwrite the pulled opencode image.
+  build: ./images/base
+  image: opencode-base:local
   restart: unless-stopped
+  # tty + stdin_open so `docker exec -it` / `docker attach` get a usable terminal.
+  tty: true
+  stdin_open: true
   env_file: ${ENV_FILE:-.env.local}
   working_dir: /workspace
   networks:
@@ -75,7 +80,7 @@ services:
 
   frontend:
     <<: *opencode
-    # Adds git and gh. Own tag so the build does not overwrite the pulled opencode image.
+    # Adds git and gh on top of bash and curl. Own tag so the build does not overwrite the pulled opencode image.
     build: ./images/frontend
     image: opencode-frontend:local
     container_name: opencode-frontend
