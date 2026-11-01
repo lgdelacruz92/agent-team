@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { branchName, buildPrompt, buildWrapup, formatMarker, parseMarker, reportBody, reportHeader } from "../src/prompt.js"
-import { countAttempts, reconcile } from "../src/reconcile.js"
+import { branchName, buildPrompt, buildWrapup, formatMarker, parseMarker, reportBody, reportHeader } from "../src/components/prompt.js"
+import { countAttempts, reconcile } from "../src/components/reconcile.js"
 
 const soft = new Date("2026-11-02T10:24:00Z")
 const hard = new Date("2026-11-02T10:30:00Z")

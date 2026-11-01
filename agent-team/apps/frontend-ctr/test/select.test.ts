@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { select, type Ticket } from "../src/select.js"
+import { select } from "../src/components/select.js"
+import type { Ticket } from "../src/interfaces/ticket.js"
 
 const ticket = (id: number, over: Partial<Ticket> = {}): Ticket => ({
   id,

@@ -1,37 +1,83 @@
-// The only worker-specific module. A sibling controller (backend, aws-solutions-architect) copies this file.
+// Configuration for the frontend controller.
+// This is the only worker-specific module: a sibling controller (backend, aws-solutions-architect) copies this file.
 
-const num = (name: string, fallback: number) => {
-  const value = Number(process.env[name])
-  return Number.isFinite(value) && process.env[name] ? value : fallback
+// Reads a numeric environment value, falling back to the default when it is missing or not a number.
+const readNumber = (raw: string | undefined, fallback: number): number => {
+  if (!raw) {
+    return fallback
+  }
+
+  const value = Number(raw)
+  if (Number.isFinite(value)) {
+    return value
+  }
+
+  return fallback
 }
+
+// Removes a trailing slash so paths can be appended safely.
+const trimSlash = (url: string): string => url.replace(/\/$/, "")
+
+// ---- Environment variables: every input of the controller, in one place ----
+
+// HTTP server
+const _port = readNumber(process.env.PORT, 3000)
+const _host = process.env.HOST ?? "0.0.0.0"
+
+// Vikunja
+const _vikunjaUrl = trimSlash(process.env.VIKUNJA_URL ?? "http://host.docker.internal:3456")
+const _vikunjaToken = process.env.VIKUNJA_API_TOKEN ?? ""
+const _vikunjaTimeoutMs = readNumber(process.env.VIKUNJA_TIMEOUT_MS, 30_000)
+const _projectId = readNumber(process.env.CTR_PROJECT_ID, 0)
+
+// Frontend worker (opencode server)
+const _opencodeUrl = trimSlash(process.env.FRONTEND_URL ?? "http://opencode-frontend:4096")
+const _opencodeUser = process.env.OPENCODE_SERVER_USERNAME ?? "opencode"
+const _opencodePassword = process.env.OPENCODE_SERVER_PASSWORD ?? ""
+const _opencodeTimeoutMs = readNumber(process.env.CTR_OPENCODE_TIMEOUT_MS, 30_000)
+
+// Scheduling and deadlines
+const _pollMs = readNumber(process.env.CTR_POLL_MS, 30_000)
+const _defaultBudgetMin = readNumber(process.env.CTR_DEFAULT_BUDGET_MIN, 30)
+const _maxRunMin = readNumber(process.env.CTR_MAX_RUN_MIN, 60)
+const _graceMin = readNumber(process.env.CTR_GRACE_MIN, 5)
+const _maxFailures = readNumber(process.env.CTR_MAX_FAILURES, 3)
+const _dryRun = process.env.CTR_DRY_RUN === "true"
+
+// GitHub (optional): lets the controller look for a pull request on the branch after a hard deadline
+const _githubRepo = process.env.CTR_GITHUB_REPO ?? ""
+const _githubToken = process.env.GITHUB_TOKEN ?? ""
+
+// ---- Config built from the values above ----
 
 export const config = {
   worker: "frontend",
+
   // Prefix of every comment the controller writes; also how it finds its own comments.
   marker: "[frontend-ctr]",
-  port: num("PORT", 3000),
-  host: process.env.HOST ?? "0.0.0.0",
 
-  vikunjaUrl: (process.env.VIKUNJA_URL ?? "http://host.docker.internal:3456").replace(/\/$/, ""),
-  vikunjaToken: process.env.VIKUNJA_API_TOKEN ?? "",
-  vikunjaTimeoutMs: num("VIKUNJA_TIMEOUT_MS", 30_000),
-  projectId: num("CTR_PROJECT_ID", 0),
+  port: _port,
+  host: _host,
 
-  opencodeUrl: (process.env.FRONTEND_URL ?? "http://opencode-frontend:4096").replace(/\/$/, ""),
-  opencodeUser: process.env.OPENCODE_SERVER_USERNAME ?? "opencode",
-  opencodePassword: process.env.OPENCODE_SERVER_PASSWORD ?? "",
-  opencodeTimeoutMs: num("CTR_OPENCODE_TIMEOUT_MS", 30_000),
+  vikunjaUrl: _vikunjaUrl,
+  vikunjaToken: _vikunjaToken,
+  vikunjaTimeoutMs: _vikunjaTimeoutMs,
+  projectId: _projectId,
 
-  pollMs: num("CTR_POLL_MS", 30_000),
-  defaultBudgetMin: num("CTR_DEFAULT_BUDGET_MIN", 30),
-  maxRunMin: num("CTR_MAX_RUN_MIN", 60),
-  graceMin: num("CTR_GRACE_MIN", 5),
-  maxFailures: num("CTR_MAX_FAILURES", 3),
-  dryRun: process.env.CTR_DRY_RUN === "true",
+  opencodeUrl: _opencodeUrl,
+  opencodeUser: _opencodeUser,
+  opencodePassword: _opencodePassword,
+  opencodeTimeoutMs: _opencodeTimeoutMs,
 
-  // Optional: lets the controller look for a pull request on the branch after a hard deadline.
-  githubRepo: process.env.CTR_GITHUB_REPO ?? "",
-  githubToken: process.env.GITHUB_TOKEN ?? "",
+  pollMs: _pollMs,
+  defaultBudgetMin: _defaultBudgetMin,
+  maxRunMin: _maxRunMin,
+  graceMin: _graceMin,
+  maxFailures: _maxFailures,
+  dryRun: _dryRun,
+
+  githubRepo: _githubRepo,
+  githubToken: _githubToken,
 
   // Kanban bucket titles, compared case-insensitively.
   buckets: {
@@ -42,5 +88,3 @@ export const config = {
     done: "Done",
   },
 } as const
-
-export type Config = typeof config
