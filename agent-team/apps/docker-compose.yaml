@@ -130,8 +130,11 @@ services:
     working_dir: /app
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # Node inspector on 9229 so VS Code can attach (frontend-ctr/.vscode/launch.json).
+    command: ["node", "--inspect=0.0.0.0:9229", "dist/index.js"]
     ports:
       - "127.0.0.1:3200:3000"
+      - "127.0.0.1:9229:9229"
     networks:
       - shared
     depends_on:
