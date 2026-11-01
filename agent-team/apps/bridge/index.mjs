@@ -100,7 +100,7 @@ async function oc(method, path, body) {
     signal: AbortSignal.timeout(REPLY_TIMEOUT_MS),
   })
   if (!res.ok) throw new HttpError(`OpenCode ${method} ${path} returned ${res.status}: ${await res.text()}`, res.status)
-  return res.json()
+  return res.status === 204 ? null : res.json()
 }
 
 // ---- Conversation -> OpenCode session map, kept on disk so restarts keep context ----
@@ -120,26 +120,43 @@ function saveSessions() {
 }
 
 async function newSession(key, title) {
-  sessions[key] = (await oc("POST", "/session", { title: title.slice(0, 60) })).id
+  sessions[key] = (await oc("POST", "/api/session", { title: title.slice(0, 60), agent: AGENT })).data.id
   saveSessions()
   return sessions[key]
 }
 
+// OpenCode v2 is asynchronous: queue the prompt, wait for the session to go idle, then read the
+// messages that arrived after our prompt. The list is newest first and ends the run with an
+// "idle" entry carrying the outcome.
+const MAX_WAITS = 5
+
+async function runPrompt(id, text) {
+  const promptId = (await oc("POST", `/api/session/${id}/prompt`, { text })).data.id
+  for (let attempt = 0; attempt < MAX_WAITS; attempt++) {
+    await oc("POST", `/api/experimental/session/${id}/wait`)
+    const messages = (await oc("GET", `/api/session/${id}/message`)).data
+    const ours = messages.filter((message) => message.id > promptId)
+    const idle = ours.find((message) => message.type === "idle")
+    if (idle) return { messages: ours, idle }
+  }
+  throw new Error("the CTO did not finish the request")
+}
+
 async function askCto(key, text) {
-  const send = (id) => oc("POST", `/session/${id}/message`, { agent: AGENT, parts: [{ type: "text", text }] })
-  let message
+  let run
   try {
-    message = await send(sessions[key] ?? (await newSession(key, text)))
+    run = await runPrompt(sessions[key] ?? (await newSession(key, text)), text)
   } catch (err) {
     // The session is gone, e.g. the cto-data volume was reset. Start a fresh one once.
     if (err.status !== 404) throw err
-    message = await send(await newSession(key, text))
+    run = await runPrompt(await newSession(key, text), text)
   }
-  const reply = (message.parts ?? [])
+  const final = run.messages.find((message) => message.type === "assistant" && message.content?.some((part) => part.type === "text"))
+  const reply = (final?.content ?? [])
     .filter((part) => part.type === "text")
     .map((part) => part.text)
     .join("\n")
-  const error = message.info?.error ? `\n\nCTO error: ${JSON.stringify(message.info.error)}` : ""
+  const error = run.idle.error ? `\n\nCTO error: ${run.idle.error.message ?? JSON.stringify(run.idle.error)}` : ""
   return `${reply || "(The CTO returned no text.)"}${error}`
 }
 

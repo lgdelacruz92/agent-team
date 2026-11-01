@@ -11,3 +11,4 @@ node_modules/
 .env*
 **/*/opencode.json
 agent-team/apps/workspace/cto-token-report.*.txt
+**/*/*.tgz

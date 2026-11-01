@@ -20,7 +20,7 @@ x-opencode-command: &opencode-command
   - "4096"
   - --print-logs
   - --log-level
-  - DEBUG
+  - debug
 
 services:
   # You talk to this one. The CTO plans the work and creates tickets in Vikunja.
@@ -35,7 +35,7 @@ services:
       - ./workspace:/workspace
       - ./opencode.json:/workspace/opencode.json:ro
       - ./agents/cto.md:/root/.config/opencode/agents/cto.md:ro
-      - ./tools/vikunja.ts:/root/.config/opencode/tools/vikunja.ts:ro
+      - ./plugins/vikunja:/root/.config/opencode/plugins/vikunja:ro
       - cto-data:/root/.local/share/opencode
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -54,7 +54,7 @@ services:
       - ./workspace:/workspace
       - ./opencode.json:/workspace/opencode.json:ro
       - ./agents/tech-lead.md:/root/.config/opencode/agents/tech-lead.md:ro
-      - ./tools/vikunja.ts:/root/.config/opencode/tools/vikunja.ts:ro
+      - ./plugins/vikunja:/root/.config/opencode/plugins/vikunja:ro
       - tech-lead-data:/root/.local/share/opencode
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -94,7 +94,7 @@ services:
       - ./workspace:/workspace
       - ./opencode.json:/workspace/opencode.json:ro
       - ./agents/frontend.md:/root/.config/opencode/agents/frontend.md:ro
-      - ./tools/vikunja.ts:/root/.config/opencode/tools/vikunja.ts:ro
+      - ./plugins/vikunja:/root/.config/opencode/plugins/vikunja:ro
       - frontend-data:/root/.local/share/opencode
     extra_hosts:
       - "host.docker.internal:host-gateway"
