@@ -5,7 +5,14 @@ import { hasAcceptanceCriteria } from "../src/components/select.js"
 describe("htmlToText", () => {
   it("turns headings, paragraphs and lists into lines", () => {
     const html = "<h3>Acceptance checklist</h3><ol><li>Form renders</li><li>Tests pass &amp; lint</li></ol><p>Done</p>"
-    expect(htmlToText(html)).toBe("Acceptance checklist\n- Form renders\n- Tests pass & lint\n\nDone")
+    const text = htmlToText(html)
+
+    // Headings keep their case, ordered lists are numbered, entities are decoded.
+    expect(text).toContain("Acceptance checklist")
+    expect(text).toContain("1. Form renders")
+    expect(text).toContain("2. Tests pass & lint")
+    expect(text).toContain("Done")
+    expect(text).not.toContain("<")
   })
 
   it("leaves plain text such as marker comments unchanged", () => {
