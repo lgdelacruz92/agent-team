@@ -183,6 +183,12 @@ async function run(input: any, context: any): Promise<string> {
         }
         return json(label ? found.filter((t: any) => t.labels.includes(label)) : found)
       }
+      case "get_task": {
+        if (!taskId) return "get_task needs taskId."
+        const task = await call("GET", `/tasks/${taskId}`)
+        if (isScoped(context)) guard(context, task)
+        return json(brief(task))
+      }
       case "create_task": {
         const scope = activeGoal(context)
         const labels = await ensureLabels(scope ? [scope] : [])
@@ -271,6 +277,7 @@ const ACTIONS = [
   "set_goal",
   "list_projects",
   "list_tasks",
+  "get_task",
   "create_task",
   "create_tasks",
   "update_task",
@@ -292,7 +299,7 @@ export default Plugin.define({
         name: "vikunja",
         description:
           "Track work in Vikunja. Actions: set_goal (needs goal: a short name; scopes this session to one goal, call it first when planning); " +
-          "list_projects; list_tasks (optional projectId, optional filter such as 'done = false'; optional label to keep only tasks carrying it); " +
+          "list_projects; list_tasks (optional projectId, optional filter such as 'done = false'; optional label to keep only tasks carrying it); get_task (needs taskId; returns one ticket with its description and labels); " +
           "create_task (needs projectId and title); update_task (needs taskId, change any of title, description, dueDate, priority; dueDate 'none' clears it); " +
           "complete_task and reopen_task (need taskId); add_label and remove_label (need taskId and label, e.g. the states 'ready', 'assigned', 'in-progress', 'review', 'retry', 'completed', or a worker name); " +
           "add_comment (needs taskId and comment) and list_comments (needs taskId). " +

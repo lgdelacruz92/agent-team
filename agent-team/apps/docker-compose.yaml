@@ -42,30 +42,6 @@ services:
       - "host.docker.internal:host-gateway"
     command: *opencode-command
 
-  # Knows what each worker can do and hands the CTO's tickets from Vikunja to them. Keeps the team
-  # capabilities in workspace/team/capabilities.md.
-  tech-lead:
-    <<: *opencode
-    container_name: opencode-tech-lead
-    ports:
-      - "127.0.0.1:4100:4096"
-    environment:
-      OPENCODE_CONFIG_CONTENT: '{"default_agent":"tech-lead"}'
-    volumes:
-      - ./workspace:/workspace
-      - ./opencode.json:/workspace/opencode.json:ro
-      - ./agents/tech-lead.md:/root/.config/opencode/agents/tech-lead.md:ro
-      - ./plugins/compact:/root/.config/opencode/plugins/compact:ro
-      - ./plugins/vikunja:/root/.config/opencode/plugins/vikunja:ro
-      - tech-lead-data:/root/.local/share/opencode
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    command: *opencode-command
-    depends_on:
-      - backend
-      - frontend
-      - aws-architect
-
   backend:
     <<: *opencode
     container_name: opencode-backend
@@ -147,7 +123,6 @@ services:
 
 volumes:
   cto-data:
-  tech-lead-data:
   backend-data:
   frontend-data:
   aws-architect-data:
