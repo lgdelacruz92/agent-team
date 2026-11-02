@@ -1,4 +1,4 @@
-// Client for one opencode agent server. state() and clearSessions() are implemented; the other methods are still stubs.
+// Client for one opencode agent server. state(), createSession() and clearSessions() are implemented; the other methods are still stubs.
 import { config } from "../config.js"
 import type {
   OpencodeAgentInterface,
@@ -65,8 +65,22 @@ export class OpencodeAgent implements OpencodeAgentInterface {
   }
 
   // Opens a new session for one ticket.
-  createSession(_title: string): Promise<OpencodeSessionInterface> {
-    throw new Error("Method not implemented.")
+  // Posts to POST /api/session and returns the id the server assigned. Throws when the server does not answer.
+  async createSession(title: string): Promise<OpencodeSessionInterface> {
+    const res = await fetch(`${this.baseUrl}/api/session`, {
+      method: "POST",
+      headers: { ...this.headers(), "Content-Type": "application/json" },
+      body: JSON.stringify({ title }),
+      signal: AbortSignal.timeout(config.opencodeTimeoutMs),
+    })
+
+    if (!res.ok) {
+      throw new Error(`opencode ${this.name} POST /api/session returned ${res.status}`)
+    }
+
+    const body = (await res.json()) as { data: { id: string } }
+
+    return { id: body.data.id }
   }
 
   // Sends a prompt to a session without waiting for the agent to finish.

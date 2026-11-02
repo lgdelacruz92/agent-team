@@ -186,3 +186,40 @@ describe("OpencodeAgent.clearSessions", () => {
     await expect(new OpencodeAgent("frontend").clearSessions()).rejects.toThrow("returned 500")
   })
 })
+
+describe("OpencodeAgent.createSession", () => {
+  it("posts the title and returns the id of the new session", async () => {
+    const fetchMock = stubFetch(200, { data: { id: "ses_new" } })
+
+    const created = await new OpencodeAgent("frontend").createSession("F14-3 mark sold")
+
+    expect(created).toEqual({ id: "ses_new" })
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe("http://opencode.test/api/session")
+    expect(init.method).toBe("POST")
+    expect(JSON.parse(init.body)).toEqual({ title: "F14-3 mark sold" })
+  })
+
+  it("sends basic auth and a JSON content type", async () => {
+    const fetchMock = stubFetch(200, { data: { id: "ses_new" } })
+
+    await new OpencodeAgent("frontend").createSession("title")
+
+    const { headers } = fetchMock.mock.calls[0][1]
+    expect(headers.Authorization).toBe(`Basic ${Buffer.from("opencode:secret").toString("base64")}`)
+    expect(headers["Content-Type"]).toBe("application/json")
+  })
+
+  it("throws when the server answers with an error", async () => {
+    stubFetch(500, {})
+
+    await expect(new OpencodeAgent("frontend").createSession("title")).rejects.toThrow("returned 500")
+  })
+
+  it("throws when the request fails", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new Error("connection refused")))
+
+    await expect(new OpencodeAgent("frontend").createSession("title")).rejects.toThrow("connection refused")
+  })
+})
