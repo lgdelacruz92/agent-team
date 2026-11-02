@@ -180,7 +180,7 @@ async function updateOne(context: any, taskId: number, changes: any) {
 }
 
 async function run(input: any, context: any): Promise<string> {
-  const { action, projectId, taskId, title, description, dueDate, priority, filter, label, comment, goal, tasks, taskIds, add, remove, status, blockedBy, projectIds, columns } = input
+  const { action, projectId, taskId, title, description, dueDate, priority, filter, label, comment, goal, tasks, taskIds, add, remove, status, blockedBy, blocking, projectIds, columns } = input
   if (!TOKEN) return "Vikunja failed: VIKUNJA_API_TOKEN is not set in the container."
   try {
     switch (action) {
@@ -358,6 +358,23 @@ async function run(input: any, context: any): Promise<string> {
         const failed = results.filter((r: any) => r.error).length
         return json({ related: results.length - failed, failed, results })
       }
+      case "remove_relations": {
+        const blockers = Array.isArray(blockedBy) ? blockedBy : []
+        const blocked = Array.isArray(blocking) ? blocking : []
+        if (!taskId || (!blockers.length && !blocked.length)) return "remove_relations needs taskId and blockedBy (tickets that block it) and/or blocking (tickets it blocks): the IDs whose relation to remove."
+        guard(context, await call("GET", `/tasks/${taskId}`))
+        const links = [
+          ...blockers.map((other: number) => ({ other, kind: "blocked" })),
+          ...blocked.map((other: number) => ({ other, kind: "blocking" })),
+        ]
+        const results = await pool(links, async (link: { other: number; kind: string }) => {
+          // Vikunja deletes the inverse relation on the other ticket itself.
+          await call("DELETE", `/tasks/${taskId}/relations/${link.kind}/${link.other}`)
+          return { id: link.other, kind: link.kind }
+        })
+        const failed = results.filter((r: any) => r.error).length
+        return json({ removed: results.length - failed, failed, results })
+      }
       case "add_label":
       case "remove_label": {
         if (!taskId || !label) return `${action} needs taskId and label.`
@@ -416,6 +433,7 @@ const ACTIONS = [
   "set_status",
   "create_columns",
   "add_relations",
+  "remove_relations",
   "add_comment",
   "list_comments",
 ]
@@ -435,18 +453,20 @@ export default Plugin.define({
           "set_status (needs taskIds and status: Ready, In progress, Review, Retry, Done or Archived; moves the tickets to that Kanban column; Archived parks superseded tickets where the team never picks them up, it needs that column to exist); " +
           "create_columns (needs projectId or projectIds; optional columns: titles, default Ready, In progress, Review, Retry, Done; adds only the missing Kanban columns, so it is safe to repeat; add 'Archived' to columns when you need it); " +
           "add_relations (needs taskId and blockedBy: IDs of the tickets that must be accepted first; Vikunja adds the inverse 'blocking' relation itself); " +
+          "remove_relations (needs taskId and blockedBy and/or blocking: IDs of tickets that block it and IDs of tickets it blocks; removes those relations, and Vikunja removes the inverse on the other ticket; the tickets themselves are untouched); " +
           "add_comment (needs taskId and comment) and list_comments (needs taskId). " +
           "BULK, prefer these whenever you touch more than one ticket, they take one call instead of many: " +
           "create_tasks (needs tasks: [{projectId, title, description?, dueDate?, priority?, labels?}]); " +
           "update_tasks (needs tasks: [{taskId, title?, description?, dueDate?, priority?, done?}]); " +
-          "label_tasks (needs taskIds, plus add and/or remove: label titles). Bulk calls return one short result per ticket, with its error if it failed, and a failed count: always check it and retry only the failed tickets. There is no delete.",
+          "label_tasks (needs taskIds, plus add and/or remove: label titles). Bulk calls return one short result per ticket, with its error if it failed, and a failed count: always check it and retry only the failed tickets. Tasks cannot be deleted; only relations can be removed.",
         input: {
           type: "object",
           properties: {
             action: { type: "string", enum: ACTIONS, description: "What to do" },
             goal: { type: "string", description: "Goal number (set_goal), e.g. '1' or 'GOAL-1'" },
             status: { type: "string", description: "Kanban status (set_status, list_tasks): Ready, In progress, Review, Retry or Done" },
-            blockedBy: { type: "array", items: { type: "number" }, description: "IDs of the tickets that block taskId (add_relations)" },
+            blockedBy: { type: "array", items: { type: "number" }, description: "IDs of the tickets that block taskId (add_relations, remove_relations)" },
+            blocking: { type: "array", items: { type: "number" }, description: "IDs of the tickets that taskId blocks (remove_relations)" },
             projectId: { type: "number", description: "Vikunja project ID (create_task, list_tasks, create_columns)" },
             projectIds: { type: "array", items: { type: "number" }, description: "Project IDs (create_columns)" },
             columns: { type: "array", items: { type: "string" }, description: "Kanban column titles to create (create_columns)" },

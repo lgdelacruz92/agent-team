@@ -21,7 +21,7 @@ export class Controller {
   private busy = false
 
   // The Vikunja client is injected so tests can pass a fake; it defaults to the shared client.
-  constructor(private readonly vikunja: Vikunja = Vikunja.getInstance()) {}
+  constructor(private readonly vikunja: Vikunja = Vikunja.getInstance()) { }
 
   private snapshot: Snapshot = {
     paused: false,
@@ -53,6 +53,18 @@ export class Controller {
       }
 
       // get tasks
+      const buckets = await this.vikunja.listBuckets()
+
+      // Every task on the board, flattened, each tagged with its column title.
+      const tasks = buckets.filter(bucket => bucket.title == 'Ready').flatMap((bucket) =>
+        (bucket.tasks ?? [])
+      )
+
+      const unblockedTasks = tasks.filter(task => {
+        const blockingTasks = task.related_tasks?.blocked
+        return blockingTasks ? blockingTasks.length == 0 : true
+    });
+      console.log(unblockedTasks);
       // find ready
       // find no blockers
       // pass to front end

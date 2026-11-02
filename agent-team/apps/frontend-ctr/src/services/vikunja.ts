@@ -137,9 +137,4 @@ export class Vikunja {
 
     return comments.sort((a, b) => a.id - b.id)
   }
-
-  // Adds a comment to a task.
-  async addComment(taskId: number, comment: string): Promise<void> {
-    await this.write("PUT", `/tasks/${taskId}/comments`, { comment })
-  }
 }
