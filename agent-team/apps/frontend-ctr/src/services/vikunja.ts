@@ -108,6 +108,16 @@ export class Vikunja {
     return this.call<VikunjaBucket[]>("GET", `/projects/${this.projectId}/views/${kanban.id}/tasks?per_page=200`)
   }
 
+  // Tasks in the Ready column that no other task blocks.
+  async listUnblockedReadyTasks(): Promise<VikunjaTask[]> {
+    const buckets = await this.listBuckets()
+    const tasks = buckets
+      .filter((bucket) => bucket.title.toLowerCase() === "ready")
+      .flatMap((bucket) => bucket.tasks ?? [])
+
+    return tasks.filter((task) => (task.related_tasks?.blocked ?? []).length === 0)
+  }
+
   // Reads one task by id.
   getTask(taskId: number): Promise<VikunjaTask> {
     return this.call<VikunjaTask>("GET", `/tasks/${taskId}`)

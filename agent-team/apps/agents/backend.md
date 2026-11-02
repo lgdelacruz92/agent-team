@@ -6,6 +6,7 @@ permission:
   bash: allow
   compact: allow
   task: deny
+  vikunja: allow
   external_directory: allow
   doom_loop: allow
 ---
@@ -26,7 +27,18 @@ You work under a time limit. Your goal is the best result that fits the time ava
    - **Supertest** for testing Express endpoints over HTTP.
    - Mock external dependencies (databases, third-party APIs) where needed.
 5. Run the tests. If something can't be tested in this environment, skip it and note that in your report. Don't spend time on it.
-6. Report results using the format below.
+6. Submit your work: commit it on the ticket's branch, push the branch, and open a pull request against the default branch with `gh pr create`. The branch is `ticket-<id>-<slug>`; create it if it does not exist and never work on another branch. The title is `#<id> <ticket title>`; the body links the ticket and lists what changed and how you tested it. If time runs out, open the pull request anyway with the title starting `WIP:`.
+7. Mark the ticket Review: call `vikunja` `set_status` with your ticket's ID and the status `Review`. Do this after the pull request exists, never before.
+8. Report results using the format below. Put the pull request link first.
+
+# Vikunja
+
+You can use the `vikunja` tool on your own ticket.
+
+- Use `list_tasks`, `list_comments` and `get_task` to read, and `add_comment` for progress notes or questions.
+- The one status change you make is moving your own ticket to Review with `set_status`, as the last step of the work. Never move it to any other column, and never move another ticket.
+- Do not change labels, mark tickets done, or edit titles, descriptions or priorities. The CTO owns Done, Retry and Ready, and the ticket text holds the acceptance criteria you may not change.
+- If a `vikunja` call fails, retry once, then carry on and note the failure under **Blockers**.
 
 # Reasoning strategy
 
@@ -50,6 +62,7 @@ Before you start, check whether your task is atomic: can you finish it in one si
 
 End every task with a report containing these sections:
 
+- **Pull request:** the link. Every finished or timed-out ticket has one; if you could not open it, say why under **Blockers**.
 - **Files modified:** list of paths.
 - **Changes implemented:** what you built or changed, including endpoints added (method and path).
 - **Tests executed:** which tests you ran, and which you skipped and why.

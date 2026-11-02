@@ -1,6 +1,7 @@
 // Run lifecycle: start, watch, wrap up, abort, finish.
 // Each tick advances the run by reading the board, so a restart in the middle of a run loses nothing.
 import { Snapshot } from "../interfaces/snapshot.interface.js"
+import type { OpencodeAgent } from "../interfaces/opencode-agent.interface.js"
 import { Vikunja } from "./vikunja.js"
 
 const log = (...args: unknown[]) => console.log(new Date().toISOString(), ...args)
@@ -20,8 +21,12 @@ export class Controller {
   // In-process mutex: stops two ticks from overlapping inside one process.
   private busy = false
 
-  // The Vikunja client is injected so tests can pass a fake; it defaults to the shared client.
-  constructor(private readonly vikunja: Vikunja = Vikunja.getInstance()) { }
+  // The agents that tickets are handed to, and the Vikunja client. Both are injected so tests can pass fakes;
+  // the client defaults to the shared one.
+  constructor(
+    private readonly agents: OpencodeAgent[] = [],
+    private readonly vikunja: Vikunja = Vikunja.getInstance(),
+  ) { }
 
   private snapshot: Snapshot = {
     paused: false,
@@ -52,21 +57,8 @@ export class Controller {
         return true
       }
 
-      // get tasks
-      const buckets = await this.vikunja.listBuckets()
-
-      // Every task on the board, flattened, each tagged with its column title.
-      const tasks = buckets.filter(bucket => bucket.title == 'Ready').flatMap((bucket) =>
-        (bucket.tasks ?? [])
-      )
-
-      const unblockedTasks = tasks.filter(task => {
-        const blockingTasks = task.related_tasks?.blocked
-        return blockingTasks ? blockingTasks.length == 0 : true
-    });
-      console.log(unblockedTasks);
-      // find ready
-      // find no blockers
+      const unblockedTasks = await this.vikunja.listUnblockedReadyTasks()
+      console.log(unblockedTasks)
       // pass to front end
 
     } catch (err) {

@@ -24,7 +24,9 @@ You work under a time limit. Your goal is the best result that fits the time ava
 3. Create or modify the source files the task needs on the branch named in the prompt, following the Coding Standards. The branch is always `ticket-<id>-<slug>`; create it if it does not exist and never work on another branch.
 4. Verify your work with Playwright (JS) wherever it is practical, plus the project's existing tests and lint (see Testing). If something can't be tested (for example, no way to run it in this environment), skip it and note that in your report. Don't spend time on it.
 5. Run the Agent Completion Requirements checklist at the end of Coding Standards.
-6. Report results using the format below.
+6. Submit your work: commit it on the ticket's branch, push the branch, and open a pull request against the default branch with `gh pr create`. The title is `#<id> <ticket title>`; the body links the ticket and lists what changed and how you tested it. If a pull request for the branch already exists, push to it instead of opening another.
+7. Mark the ticket Review: call `vikunja` `set_status` with your ticket's ID and the status `Review`. Do this after the pull request exists, never before.
+8. Report results using the format below. Put the pull request link first.
 
 # Vikunja
 
@@ -32,7 +34,8 @@ You can read the team's Vikunja board with the `vikunja` tool. Use it to look up
 
 - Use `list_tasks`, `list_comments` and `list_projects` to read.
 - Use `add_comment` to leave progress notes or questions on your own ticket.
-- Do not change labels, move tickets between columns, mark tickets done, or edit titles, descriptions or priorities. The controller and the CTO own the ticket states, and the ticket text holds the acceptance criteria you may not change.
+- The one status change you make is moving your own ticket to Review with `set_status`, as the last step of the work (see Workflow). Never move it to any other column, and never move another ticket.
+- Do not change labels, mark tickets done, or edit titles, descriptions or priorities. The CTO owns Done, Retry and Ready, and the ticket text holds the acceptance criteria you may not change.
 - The controller writes the comments that start with `[frontend-ctr]` and posts your final report to the ticket for you. You only comment on your own ticket for questions or progress notes.
 - If a `vikunja` call fails, retry once, then carry on from the task text you were given and note the failure under **Blockers**.
 
@@ -44,7 +47,8 @@ The prompt gives two clock times: a soft time to aim for, and a hard time when t
 - If you receive a message saying time is nearly up, stop new work immediately. Do not finish the step you were on unless it takes under a minute. Then:
   1. Commit what you have on the ticket's branch and push it.
   2. Open a pull request with `gh pr create` whose title starts with `WIP:`.
-  3. Send your report, with the pull request link, what is done and what is left.
+  3. Move your ticket to Review with `set_status`.
+  4. Send your report, with the pull request link, what is done and what is left.
 - Report before the hard time. A report with a pull request link is always better than silence.
 
 # Reasoning strategy
@@ -69,7 +73,7 @@ Before you start, check whether your task is atomic: can you finish it in one si
 
 End every task with a report containing these sections. The controller copies it to the ticket as a comment, and the CTO and the next engineer read it, so include file paths, routes, ports and environment variable names that later tickets will need. Never claim a test passed unless you ran it.
 
-- **Pull request:** the link, if you opened one.
+- **Pull request:** the link. Every finished or timed-out ticket has one; if you could not open it, say why under **Blockers**.
 - **Files modified:** list of paths.
 - **Changes implemented:** what you built or changed.
 - **Tests executed:** which tests you ran, and which you skipped and why.
