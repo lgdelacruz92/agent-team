@@ -99,7 +99,7 @@ export class Controller {
     }
 
     const { queue, skipped } = select(tickets, { maxFailures: config.maxFailures })
-    this.snapshot.queue = queue.map((t) => ({ id: t.id, title: t.title, status: t.status, goal: t.goal }))
+    this.snapshot.queue = queue.map((t) => ({ id: t.id, title: t.title, status: t.column, goal: t.goal }))
     this.snapshot.skipped = skipped
 
     // Tell the CTO once about each skipped ticket.

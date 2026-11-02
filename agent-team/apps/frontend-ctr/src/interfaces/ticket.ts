@@ -17,6 +17,9 @@ export interface Ticket {
   dueDate: string | null
   status: Status | null
 
+  // Title of the Kanban column the ticket sits in, exactly as shown on the board.
+  column: string | null
+
   // N from the GOAL-N label, or null when the ticket has none.
   goal: number | null
   blockers: Blocker[]

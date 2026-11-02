@@ -82,6 +82,7 @@ export async function loadBoard(): Promise<Board> {
   const titles = statusByTitle()
   const buckets = new Map<Status, number>()
   const statusOf = new Map<number, Status>()
+  const columnOf = new Map<number, string>()
   const tasks: any[] = []
 
   const columns: any[] = await call("GET", `/projects/${projectId}/views/${kanban.id}/tasks?per_page=200`)
@@ -93,6 +94,7 @@ export async function loadBoard(): Promise<Board> {
 
     for (const task of column.tasks ?? []) {
       tasks.push(task)
+      columnOf.set(task.id, String(column.title))
 
       if (status) {
         statusOf.set(task.id, status)
@@ -100,7 +102,7 @@ export async function loadBoard(): Promise<Board> {
     }
   }
 
-  return { projectId, viewId: kanban.id, buckets, tasks, statusOf }
+  return { projectId, viewId: kanban.id, buckets, tasks, statusOf, columnOf }
 }
 
 // Reads N from the GOAL-N label, or null when the task has none.
@@ -174,6 +176,7 @@ export async function listTickets(board: Board): Promise<Ticket[]> {
       description: htmlToText(task.description ?? ""),
       dueDate: dueOf(task),
       status: board.statusOf.get(task.id) ?? null,
+      column: board.columnOf.get(task.id) ?? null,
       goal: goalOf(task),
       blockers,
       blockingCount: (related.blocking ?? []).length,
@@ -213,4 +216,5 @@ export async function setStatus(board: Board, taskId: number, status: Status): P
   })
 
   board.statusOf.set(taskId, status)
+  board.columnOf.set(taskId, config.buckets[status])
 }

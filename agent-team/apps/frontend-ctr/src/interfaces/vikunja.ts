@@ -17,4 +17,7 @@ export interface Board {
   buckets: Map<Status, number>
   tasks: any[]
   statusOf: Map<number, Status>
+
+  // Title of the column each task sits in, whether or not it carries a status.
+  columnOf: Map<number, string>
 }

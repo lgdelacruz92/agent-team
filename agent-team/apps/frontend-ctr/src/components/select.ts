@@ -13,13 +13,8 @@ export function gateProblem(ticket: Ticket): string | null {
   return null
 }
 
-// Ranks tickets: Retry first, lowest GOAL-N, most dependents, lowest id.
+// Ranks tickets: lowest GOAL-N, most dependents, lowest id.
 function compareTickets(a: Ticket, b: Ticket): number {
-  const retryFirst = Number(b.status === "retry") - Number(a.status === "retry")
-  if (retryFirst !== 0) {
-    return retryFirst
-  }
-
   // A ticket without a GOAL-N label sorts after every labelled one.
   const goalA = a.goal ?? Infinity
   const goalB = b.goal ?? Infinity
@@ -34,14 +29,14 @@ function compareTickets(a: Ticket, b: Ticket): number {
   return a.id - b.id
 }
 
-// Candidates are tickets in Ready or Retry whose blockers are all Done.
+// Candidates are tickets in the Ready column whose blockers are all Done.
 // Tickets that fail the readiness gate or failed too many times are skipped with a reason.
 export function select(tickets: Ticket[], opts: { maxFailures: number }): Selection {
   const skipped: Skipped[] = []
   const queue: Ticket[] = []
 
   for (const ticket of tickets) {
-    if (ticket.status !== "ready" && ticket.status !== "retry") {
+    if (ticket.status !== "ready") {
       continue
     }
 
@@ -72,7 +67,6 @@ export function select(tickets: Ticket[], opts: { maxFailures: number }): Select
 // Candidates before the gate: tells the caller whose comments to load.
 export function unblocked(tickets: Ticket[]): Ticket[] {
   return tickets.filter((ticket) => {
-    const workable = ticket.status === "ready" || ticket.status === "retry"
-    return workable && ticket.blockers.every((blocker) => blocker.status === "done")
+    return ticket.status === "ready" && ticket.blockers.every((blocker) => blocker.status === "done")
   })
 }

@@ -8,6 +8,7 @@ const ticket = (id: number, over: Partial<Ticket> = {}): Ticket => ({
   description: "Acceptance criteria: it works",
   dueDate: null,
   status: "ready",
+  column: "Ready",
   goal: 1,
   blockers: [],
   blockingCount: 0,
@@ -17,8 +18,8 @@ const ticket = (id: number, over: Partial<Ticket> = {}): Ticket => ({
 const ids = (tickets: Ticket[]) => select(tickets, { maxFailures: 3 }).queue.map((t) => t.id)
 
 describe("select", () => {
-  it("only takes Ready and Retry tickets", () => {
-    expect(ids([ticket(1, { status: "inProgress" }), ticket(2, { status: "review" }), ticket(3, { status: "done" }), ticket(4, { status: null }), ticket(5)])).toEqual([5])
+  it("only takes tickets in the Ready column", () => {
+    expect(ids([ticket(1, { status: "inProgress" }), ticket(2, { status: "review" }), ticket(3, { status: "done" }), ticket(4, { status: null }), ticket(5), ticket(6, { status: "retry" })])).toEqual([5])
   })
 
   it("waits for blockers to be Done; Review still blocks", () => {
@@ -30,16 +31,16 @@ describe("select", () => {
     expect(ids(tickets)).toEqual([2])
   })
 
-  it("orders Retry first, then lowest GOAL-N, most dependents, lowest id", () => {
+  it("orders lowest GOAL-N, most dependents, lowest id", () => {
     const tickets = [
       ticket(1, { goal: 2 }),
       ticket(2, { goal: 1 }),
       ticket(3, { goal: 1, blockingCount: 2 }),
-      ticket(4, { goal: 3, status: "retry" }),
+      ticket(4, { goal: 3 }),
       ticket(5, { goal: null }),
       ticket(6, { goal: 1 }),
     ]
-    expect(ids(tickets)).toEqual([4, 3, 2, 6, 1, 5])
+    expect(ids(tickets)).toEqual([3, 2, 6, 1, 4, 5])
   })
 
   it("skips tickets without acceptance criteria and says why", () => {
