@@ -19,7 +19,7 @@ export type OpencodeAgentState = "idle" | "busy" | "unreachable"
 
 // An opencode agent the Controller can start work on, watch and stop.
 // The Controller receives a list of these, so it never depends on a concrete agent.
-export interface OpencodeAgent {
+export interface OpencodeAgentInterface {
   // Unique name, such as "frontend" or "backend". Used to pick the agent for a ticket.
   readonly name: string
 

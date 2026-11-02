@@ -1,7 +1,7 @@
 // Run lifecycle: start, watch, wrap up, abort, finish.
 // Each tick advances the run by reading the board, so a restart in the middle of a run loses nothing.
 import { Snapshot } from "../interfaces/snapshot.interface.js"
-import type { OpencodeAgent } from "../interfaces/opencode-agent.interface.js"
+import type { OpencodeAgentInterface } from "../interfaces/opencode-agent.interface.js"
 import type { VikunjaTask } from "../interfaces/vikunja.interface.js"
 import { Vikunja } from "./vikunja.js"
 
@@ -25,7 +25,7 @@ export class Controller {
   // The agents that tickets are handed to, and the Vikunja client. Both are injected so tests can pass fakes;
   // the client defaults to the shared one.
   constructor(
-    private readonly agents: OpencodeAgent[] = [],
+    private readonly agents: OpencodeAgentInterface[] = [],
     private readonly vikunja: Vikunja = Vikunja.getInstance(),
   ) { }
 
