@@ -2,7 +2,7 @@
 // Each tick advances the run by reading the board, so a restart in the middle of a run loses nothing.
 import { Snapshot } from "../interfaces/snapshot.interface.js"
 import type { OpencodeAgentInterface } from "../interfaces/opencode-agent.interface.js"
-import type { VikunjaTask } from "../interfaces/vikunja.interface.js"
+import type { VikunjaTaskInterface } from "../interfaces/vikunja.interface.js"
 import { Vikunja } from "./vikunja.js"
 
 const log = (...args: unknown[]) => console.log(new Date().toISOString(), ...args)
@@ -44,7 +44,7 @@ export class Controller {
   }
 
   // The prompt for an agent: the ticket and the branch to work on, as the agents' instructions expect.
-  private taskPrompt(task: VikunjaTask): string {
+  private taskPrompt(task: VikunjaTaskInterface): string {
     const slug = task.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
 
     return [
@@ -84,7 +84,7 @@ export class Controller {
             continue
           }
 
-          const task = unblockedTasks.shift() as VikunjaTask
+          const task = unblockedTasks.shift() as VikunjaTaskInterface
           const session = await agent.createSession(`#${task.id} ${task.title}`)
           await agent.prompt(session.id, this.taskPrompt(task))
           log(`gave #${task.id} to ${agent.name} (session ${session.id})`)

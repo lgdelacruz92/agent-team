@@ -1,10 +1,10 @@
 // REST client for Vikunja, exposed as a singleton: tasks, Kanban buckets and comments.
 import { config } from "../config.js"
 import type {
-  VikunjaBucket,
-  VikunjaComment,
-  VikunjaTask,
-  VikunjaView,
+  VikunjaBucketInterface,
+  VikunjaCommentInterface,
+  VikunjaTaskInterface,
+  VikunjaViewInterface,
 } from "../interfaces/vikunja.interface.js"
 
 // An HTTP failure from Vikunja, with its status code.
@@ -90,8 +90,8 @@ export class Vikunja {
   }
 
   // Finds the project's Kanban view.
-  private async kanbanView(): Promise<VikunjaView> {
-    const views = await this.call<VikunjaView[]>("GET", `/projects/${this.projectId}/views`)
+  private async kanbanView(): Promise<VikunjaViewInterface> {
+    const views = await this.call<VikunjaViewInterface[]>("GET", `/projects/${this.projectId}/views`)
     const kanban = views.find((view) => view.view_kind === "kanban")
 
     if (!kanban) {
@@ -102,14 +102,14 @@ export class Vikunja {
   }
 
   // Loads the Kanban buckets of the project, each with its tasks.
-  async listBuckets(): Promise<VikunjaBucket[]> {
+  async listBuckets(): Promise<VikunjaBucketInterface[]> {
     const kanban = await this.kanbanView()
 
-    return this.call<VikunjaBucket[]>("GET", `/projects/${this.projectId}/views/${kanban.id}/tasks?per_page=200`)
+    return this.call<VikunjaBucketInterface[]>("GET", `/projects/${this.projectId}/views/${kanban.id}/tasks?per_page=200`)
   }
 
   // Tasks in the Ready column that no other task blocks.
-  async listUnblockedReadyTasks(): Promise<VikunjaTask[]> {
+  async listUnblockedReadyTasks(): Promise<VikunjaTaskInterface[]> {
     const buckets = await this.listBuckets()
     const tasks = buckets
       .filter((bucket) => bucket.title.toLowerCase() === "ready")
@@ -119,8 +119,8 @@ export class Vikunja {
   }
 
   // Reads one task by id.
-  getTask(taskId: number): Promise<VikunjaTask> {
-    return this.call<VikunjaTask>("GET", `/tasks/${taskId}`)
+  getTask(taskId: number): Promise<VikunjaTaskInterface> {
+    return this.call<VikunjaTaskInterface>("GET", `/tasks/${taskId}`)
   }
 
   // Moves a task into the bucket with the given title (case-insensitive).
@@ -142,8 +142,8 @@ export class Vikunja {
   }
 
   // Comments of a task, oldest first.
-  async listComments(taskId: number): Promise<VikunjaComment[]> {
-    const comments = (await this.call<VikunjaComment[] | null>("GET", `/tasks/${taskId}/comments`)) ?? []
+  async listComments(taskId: number): Promise<VikunjaCommentInterface[]> {
+    const comments = (await this.call<VikunjaCommentInterface[] | null>("GET", `/tasks/${taskId}/comments`)) ?? []
 
     return comments.sort((a, b) => a.id - b.id)
   }

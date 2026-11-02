@@ -1,37 +1,37 @@
 // Types for the Vikunja REST client.
 
 // A label attached to a Vikunja task.
-export interface VikunjaLabel {
+export interface VikunjaLabelInterface {
   id: number
   title: string
 }
 
 // A Vikunja task, limited to the fields the controller reads.
-export interface VikunjaTask {
+export interface VikunjaTaskInterface {
   id: number
   title: string
   description: string
   done: boolean
   due_date: string
-  labels: VikunjaLabel[] | null
-  related_tasks?: Record<string, VikunjaTask[]>
+  labels: VikunjaLabelInterface[] | null
+  related_tasks?: Record<string, VikunjaTaskInterface[]>
 }
 
 // A Kanban column and the tasks inside it.
-export interface VikunjaBucket {
+export interface VikunjaBucketInterface {
   id: number
   title: string
-  tasks: VikunjaTask[] | null
+  tasks: VikunjaTaskInterface[] | null
 }
 
 // A project view (list, kanban, ...).
-export interface VikunjaView {
+export interface VikunjaViewInterface {
   id: number
   view_kind: string
 }
 
 // A comment on a task.
-export interface VikunjaComment {
+export interface VikunjaCommentInterface {
   id: number
   created: string
   comment: string

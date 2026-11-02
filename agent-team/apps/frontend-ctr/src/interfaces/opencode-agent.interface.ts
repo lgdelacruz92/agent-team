@@ -1,12 +1,12 @@
 // Contract for an opencode agent (for example the frontend worker) that the Controller hands tickets to.
 
 // A running conversation with an agent. One session works on one ticket.
-export interface OpencodeSession {
+export interface OpencodeSessionInterface {
   id: string
 }
 
 // One message in a session, in plain text.
-export interface OpencodeMessage {
+export interface OpencodeMessageInterface {
   id: string
 
   // Who wrote it: the controller ("user") or the agent ("assistant").
@@ -27,7 +27,7 @@ export interface OpencodeAgentInterface {
   state(): Promise<OpencodeAgentState>
 
   // Opens a new session for one ticket.
-  createSession(title: string): Promise<OpencodeSession>
+  createSession(title: string): Promise<OpencodeSessionInterface>
 
   // Sends a prompt to a session without waiting for the agent to finish.
   prompt(sessionId: string, text: string): Promise<void>
@@ -39,5 +39,5 @@ export interface OpencodeAgentInterface {
   abort(sessionId: string): Promise<void>
 
   // Messages of a session, oldest first.
-  messages(sessionId: string): Promise<OpencodeMessage[]>
+  messages(sessionId: string): Promise<OpencodeMessageInterface[]>
 }
