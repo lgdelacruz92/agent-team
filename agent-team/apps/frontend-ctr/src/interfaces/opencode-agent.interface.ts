@@ -40,4 +40,7 @@ export interface OpencodeAgentInterface {
 
   // Messages of a session, oldest first.
   messages(sessionId: string): Promise<OpencodeMessageInterface[]>
+
+  // Deletes every session of the agent, so finished tickets do not pile up.
+  clearSessions(): Promise<void>
 }
