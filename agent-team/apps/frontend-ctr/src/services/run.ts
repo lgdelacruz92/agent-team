@@ -1,10 +1,11 @@
 // Run lifecycle: start, watch, wrap up, abort, finish.
 // Each tick advances the run by reading the board, so a restart in the middle of a run loses nothing.
-import { Snapshot } from "../interfaces/snapshot.interface.js"
+import type { SnapshotInterface } from "../interfaces/snapshot.interface.js"
 import type { OpencodeAgentInterface } from "../interfaces/opencode-agent.interface.js"
 import type { VikunjaTaskInterface } from "../interfaces/vikunja.interface.js"
 import { Vikunja } from "./vikunja.js"
 
+// Logs a line prefixed with the current time.
 const log = (...args: unknown[]) => console.log(new Date().toISOString(), ...args)
 
 // Turns anything thrown into a message.
@@ -16,6 +17,7 @@ const messageOf = (err: unknown): string => {
   return String(err)
 }
 
+// Decides which tickets go to which agents. Each tick reads the board and hands ready tickets to idle agents.
 export class Controller {
   paused = false
 
@@ -27,9 +29,10 @@ export class Controller {
   constructor(
     private readonly agents: OpencodeAgentInterface[] = [],
     private readonly vikunja: Vikunja = Vikunja.getInstance(),
-  ) { }
+  ) {}
 
-  private snapshot: Snapshot = {
+  // State reported by status(); only the paused flag is live so far.
+  private snapshot: SnapshotInterface = {
     paused: false,
     lastTick: null,
     lastError: null,
@@ -39,7 +42,7 @@ export class Controller {
   }
 
   // The current run, the ordered queue and the skipped tickets, for GET /status.
-  status(): Snapshot {
+  status(): SnapshotInterface {
     return { ...this.snapshot, paused: this.paused }
   }
 
@@ -93,7 +96,6 @@ export class Controller {
           log(`could not give a task to ${agent.name}:`, messageOf(err))
         }
       }
-
     } catch (err) {
       log("tick failed:", messageOf(err))
     } finally {
@@ -102,6 +104,4 @@ export class Controller {
 
     return true
   }
-
-
 }
