@@ -1,4 +1,5 @@
 // Client for one opencode agent server. state(), createSession() and clearSessions() are implemented; the other methods are still stubs.
+import { opencodeHeaders } from "../components/opencode-headers.js"
 import { config } from "../config.js"
 import type {
   OpencodeAgentInterface,
@@ -22,13 +23,7 @@ export class OpencodeAgent implements OpencodeAgentInterface {
 
   // Basic auth header for the opencode server. Empty when no password is configured.
   private headers(): Record<string, string> {
-    if (!config.opencodePassword) {
-      return {}
-    }
-
-    const credentials = Buffer.from(`${config.opencodeUser}:${config.opencodePassword}`).toString("base64")
-
-    return { Authorization: `Basic ${credentials}` }
+    return opencodeHeaders()
   }
 
   // Reports whether the agent can take work now.
