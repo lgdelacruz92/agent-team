@@ -27,6 +27,9 @@ const stubReplies = (...replies: { status: number; body?: unknown }[]) => {
   return fetchMock
 }
 
+// A session already bound to an id, without a request: init() is what POSTs, so tests set the id directly.
+const bound = (id: string) => Object.assign(new OpencodeSession(), { id })
+
 afterEach(() => {
   vi.unstubAllGlobals()
 })
@@ -35,7 +38,7 @@ describe("OpencodeSession.prompt", () => {
   it("posts the text with basic auth", async () => {
     const fetchMock = stubReplies({ status: 200, body: { data: { id: "msg_1" } } })
 
-    await new OpencodeSession("ses_1").prompt("do the ticket")
+    await bound("ses_1").prompt("do the ticket")
 
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe("http://opencode.test/api/session/ses_1/prompt")
@@ -47,7 +50,7 @@ describe("OpencodeSession.prompt", () => {
   it("throws when the server answers with an error", async () => {
     stubReplies({ status: 404 })
 
-    await expect(new OpencodeSession("ses_1").prompt("x")).rejects.toThrow("returned 404")
+    await expect(bound("ses_1").prompt("x")).rejects.toThrow("returned 404")
   })
 })
 
@@ -55,7 +58,7 @@ describe("OpencodeSession.waitForIdle", () => {
   it("is true when the wait route answers", async () => {
     const fetchMock = stubReplies({ status: 204 })
 
-    expect(await new OpencodeSession("ses_1").waitForIdle(1000)).toBe(true)
+    expect(await bound("ses_1").waitForIdle(1000)).toBe(true)
     expect(fetchMock.mock.calls[0][0]).toBe("http://opencode.test/api/experimental/session/ses_1/wait")
   })
 
@@ -65,13 +68,13 @@ describe("OpencodeSession.waitForIdle", () => {
       vi.fn().mockRejectedValueOnce(new DOMException("The operation timed out", "TimeoutError")),
     )
 
-    expect(await new OpencodeSession("ses_1").waitForIdle(10)).toBe(false)
+    expect(await bound("ses_1").waitForIdle(10)).toBe(false)
   })
 
   it("throws on other failures", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new Error("connection refused")))
 
-    await expect(new OpencodeSession("ses_1").waitForIdle(10)).rejects.toThrow("connection refused")
+    await expect(bound("ses_1").waitForIdle(10)).rejects.toThrow("connection refused")
   })
 })
 
@@ -79,7 +82,7 @@ describe("OpencodeSession.abort", () => {
   it("posts to the interrupt route", async () => {
     const fetchMock = stubReplies({ status: 200, body: { interrupted: true } })
 
-    await new OpencodeSession("ses_1").abort()
+    await bound("ses_1").abort()
 
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe("http://opencode.test/api/session/ses_1/interrupt")
@@ -96,7 +99,7 @@ describe("OpencodeSession.messages", () => {
     const idle = { id: "m4", type: "idle" }
     const fetchMock = stubReplies({ status: 200, body: { data: [user, assistant, toolOnly, idle], cursor: { next: null } } })
 
-    expect(await new OpencodeSession("ses_1").messages()).toEqual([
+    expect(await bound("ses_1").messages()).toEqual([
       { id: "m1", role: "user", text: "hello" },
       { id: "m2", role: "assistant", text: "hi" },
     ])
@@ -109,7 +112,7 @@ describe("OpencodeSession.messages", () => {
       { status: 200, body: { data: [assistant], cursor: { next: null } } },
     )
 
-    const messages = await new OpencodeSession("ses_1").messages()
+    const messages = await bound("ses_1").messages()
 
     expect(messages.map((message) => message.id)).toEqual(["m1", "m2"])
     expect(fetchMock.mock.calls[1][0]).toBe("http://opencode.test/api/session/ses_1/message?cursor=c1")
@@ -121,7 +124,7 @@ describe("OpencodeSession.messages", () => {
       { status: 200, body: { data: [], cursor: { next: "c1" } } },
     )
 
-    expect(await new OpencodeSession("ses_1").messages()).toHaveLength(1)
+    expect(await bound("ses_1").messages()).toHaveLength(1)
   })
 })
 
@@ -129,7 +132,7 @@ describe("OpencodeSession.delete", () => {
   it("deletes the session", async () => {
     const fetchMock = stubReplies({ status: 200 })
 
-    await new OpencodeSession("ses_1").delete()
+    await bound("ses_1").delete()
 
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe("http://opencode.test/api/session/ses_1")
@@ -139,12 +142,55 @@ describe("OpencodeSession.delete", () => {
   it("treats a session that is already gone as deleted", async () => {
     stubReplies({ status: 404 })
 
-    await expect(new OpencodeSession("ses_1").delete()).resolves.toBeUndefined()
+    await expect(bound("ses_1").delete()).resolves.toBeUndefined()
   })
 
   it("throws on other failures", async () => {
     stubReplies({ status: 500 })
 
-    await expect(new OpencodeSession("ses_1").delete()).rejects.toThrow("returned 500")
+    await expect(bound("ses_1").delete()).rejects.toThrow("returned 500")
+  })
+})
+
+describe("OpencodeSession before init", () => {
+  it("refuses to call the server instead of hitting /api/session/", async () => {
+    const fetchMock = stubReplies()
+
+    await expect(new OpencodeSession().prompt("x")).rejects.toThrow("call init() first")
+    await expect(new OpencodeSession().waitForIdle(10)).rejects.toThrow("call init() first")
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe("OpencodeSession.init", () => {
+  it("posts the title, binds the id the server assigned and returns the session", async () => {
+    const fetchMock = stubReplies({ status: 200, body: { data: { id: "ses_new" } } })
+    const session = new OpencodeSession()
+
+    expect(await session.init("F14-3 mark sold")).toBe(session)
+    expect(session.id).toBe("ses_new")
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe("http://opencode.test/api/session")
+    expect(init.method).toBe("POST")
+    expect(JSON.parse(init.body)).toEqual({ title: "F14-3 mark sold" })
+    expect(init.headers["Content-Type"]).toBe("application/json")
+    expect(init.headers.Authorization).toBe(`Basic ${Buffer.from("opencode:secret").toString("base64")}`)
+  })
+
+  it("uses the base url it was given for this and later calls", async () => {
+    const fetchMock = stubReplies({ status: 200, body: { data: { id: "ses_new" } } }, { status: 200 })
+
+    const session = await new OpencodeSession().init("title", "http://other.test")
+    await session.delete()
+
+    expect(fetchMock.mock.calls[0][0]).toBe("http://other.test/api/session")
+    expect(fetchMock.mock.calls[1][0]).toBe("http://other.test/api/session/ses_new")
+  })
+
+  it("throws when the server answers with an error", async () => {
+    stubReplies({ status: 500 })
+
+    await expect(new OpencodeSession().init("title")).rejects.toThrow("returned 500")
   })
 })

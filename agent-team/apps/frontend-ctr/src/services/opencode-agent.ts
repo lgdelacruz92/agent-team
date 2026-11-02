@@ -1,4 +1,4 @@
-// Client for one opencode agent server. state(), createSession() and clearSessions() are implemented; the other methods are still stubs.
+// Client for one opencode agent server. It tracks its sessions and hands prompt, wait, abort and messages to them.
 import { opencodeHeaders } from "../components/opencode-headers.js"
 import { config } from "../config.js"
 import type {
@@ -7,6 +7,8 @@ import type {
   OpencodeMessageInterface,
   OpencodeSessionInterface,
 } from "../interfaces/opencode-agent.interface.js"
+import type { OpencodeSessionHandleInterface } from "../interfaces/opencode-session.interface.js"
+import { OpencodeSession } from "./opencode-session.js"
 
 // The part of a session record from GET /api/session that state() reads. Times are epoch milliseconds.
 interface OpencodeSessionRecord {
@@ -15,15 +17,29 @@ interface OpencodeSessionRecord {
 
 // An opencode agent the Controller can hand tickets to, identified by its name.
 export class OpencodeAgent implements OpencodeAgentInterface {
+  // The sessions this agent is working on, found by id for prompt, wait, abort and messages.
+  private readonly sessions: OpencodeSessionHandleInterface[]
+
+  // `sessions` are the ones to start with, for example sessions that survived a restart; a copy is kept so
+  // the caller's array is not changed when createSession() adds to it.
   // The server defaults to the configured opencode worker; tests can point it elsewhere.
   constructor(
     readonly name: string,
+    sessions: OpencodeSessionHandleInterface[] = [],
     private readonly baseUrl: string = config.opencodeUrl,
-  ) {}
+  ) {
+    this.sessions = [...sessions]
+  }
 
-  // Basic auth header for the opencode server. Empty when no password is configured.
-  private headers(): Record<string, string> {
-    return opencodeHeaders()
+  // Finds a tracked session by id. Throws for an id this agent does not know, so a typo cannot go unnoticed.
+  private session(sessionId: string): OpencodeSessionHandleInterface {
+    const found = this.sessions.find((session) => session.id === sessionId)
+
+    if (!found) {
+      throw new Error(`opencode ${this.name} has no session ${sessionId}`)
+    }
+
+    return found
   }
 
   // Reports whether the agent can take work now.
@@ -34,7 +50,7 @@ export class OpencodeAgent implements OpencodeAgentInterface {
 
     try {
       const res = await fetch(`${this.baseUrl}/api/session`, {
-        headers: this.headers(),
+        headers: opencodeHeaders(),
         signal: AbortSignal.timeout(config.opencodeTimeoutMs),
       })
 
@@ -60,80 +76,52 @@ export class OpencodeAgent implements OpencodeAgentInterface {
   }
 
   // Opens a new session for one ticket.
-  // Posts to POST /api/session and returns the id the server assigned. Throws when the server does not answer.
+  // The session posts to POST /api/session and returns the id the server assigned. Throws when the server does not answer.
   async createSession(title: string): Promise<OpencodeSessionInterface> {
-    const res = await fetch(`${this.baseUrl}/api/session`, {
-      method: "POST",
-      headers: { ...this.headers(), "Content-Type": "application/json" },
-      body: JSON.stringify({ title }),
-      signal: AbortSignal.timeout(config.opencodeTimeoutMs),
-    })
+    // Track the session so the other methods can reach it by id.
+    const session = await new OpencodeSession().init(title, this.baseUrl)
 
-    if (!res.ok) {
-      throw new Error(`opencode ${this.name} POST /api/session returned ${res.status}`)
-    }
+    this.sessions.push(session)
 
-    const body = (await res.json()) as { data: { id: string } }
-
-    return { id: body.data.id }
+    return { id: session.id }
   }
 
   // Sends a prompt to a session without waiting for the agent to finish.
-  prompt(_sessionId: string, _text: string): Promise<void> {
-    throw new Error("Method not implemented.")
+  prompt(sessionId: string, text: string): Promise<void> {
+    return this.session(sessionId).prompt(text)
   }
 
   // Resolves when the session stops working, or false if it is still working after timeoutMs.
-  waitForIdle(_sessionId: string, _timeoutMs: number): Promise<boolean> {
-    throw new Error("Method not implemented.")
+  waitForIdle(sessionId: string, timeoutMs: number): Promise<boolean> {
+    return this.session(sessionId).waitForIdle(timeoutMs)
   }
 
   // Stops the turn in progress; the session keeps its context.
-  abort(_sessionId: string): Promise<void> {
-    throw new Error("Method not implemented.")
+  abort(sessionId: string): Promise<void> {
+    return this.session(sessionId).abort()
   }
 
   // Messages of a session, oldest first.
-  messages(_sessionId: string): Promise<OpencodeMessageInterface[]> {
-    throw new Error("Method not implemented.")
+  messages(sessionId: string): Promise<OpencodeMessageInterface[]> {
+    return this.session(sessionId).messages()
   }
 
-  // Lists the ids of the sessions on the first page of GET /api/session. Throws when the server does not answer.
-  private async listSessionIds(): Promise<string[]> {
-    const res = await fetch(`${this.baseUrl}/api/session`, {
-      headers: this.headers(),
-      signal: AbortSignal.timeout(config.opencodeTimeoutMs),
-    })
-
-    if (!res.ok) {
-      throw new Error(`opencode ${this.name} GET /api/session returned ${res.status}`)
-    }
-
-    const body = (await res.json()) as { data: { id: string }[] }
-
-    return body.data.map((session) => session.id)
+  // Lists the ids of the sessions this agent tracks.
+  private listSessionIds(): string[] {
+    return this.sessions.map((session) => session.id)
   }
 
-  // Deletes every session of the agent.
-  // The list is paged, so it deletes the page it got and lists again until nothing is left.
+  // Deletes every session this agent tracks, and stops tracking each one as soon as it is deleted.
+  // Sessions the agent was never given (for example ones left on the server by an earlier run) are not touched.
+  // A failed delete throws and leaves that session and the ones after it tracked, so a retry picks up where it stopped.
   async clearSessions(): Promise<void> {
-    let ids = await this.listSessionIds()
+    for (const id of this.listSessionIds()) {
+      await this.session(id).delete()
 
-    while (ids.length > 0) {
-      for (const id of ids) {
-        const res = await fetch(`${this.baseUrl}/api/session/${id}`, {
-          method: "DELETE",
-          headers: this.headers(),
-          signal: AbortSignal.timeout(config.opencodeTimeoutMs),
-        })
-
-        // A session that is already gone is what we wanted; any other failure stops the loop so it cannot spin.
-        if (!res.ok && res.status !== 404) {
-          throw new Error(`opencode ${this.name} DELETE /api/session/${id} returned ${res.status}`)
-        }
-      }
-
-      ids = await this.listSessionIds()
+      this.sessions.splice(
+        this.sessions.findIndex((session) => session.id === id),
+        1,
+      )
     }
   }
 }

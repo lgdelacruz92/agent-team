@@ -24,15 +24,37 @@ interface OpencodeMessagePage {
 
 // A session the Controller drives while it works on one ticket.
 export class OpencodeSession implements OpencodeSessionHandleInterface {
-  // The server defaults to the configured opencode worker; tests can point it elsewhere.
-  constructor(
-    readonly id: string,
-    private readonly baseUrl: string = config.opencodeUrl,
-  ) {}
+  // Id the server assigned. Empty until init() is called.
+  id = ""
+
+  // The server defaults to the configured opencode worker; init() can point it elsewhere.
+  private baseUrl: string = config.opencodeUrl
+
+  // Opens the session on the server (POST /api/session) and binds this object to the id it assigned.
+  // Returns the session so it can be created and opened in one expression. Throws when the server does not answer.
+  async init(title: string, baseUrl: string = config.opencodeUrl): Promise<this> {
+    this.baseUrl = baseUrl
+
+    const res = await this.call("POST", "/api/session", { body: { title } })
+    const body = (await res.json()) as { data: { id: string } }
+
+    this.id = body.data.id
+
+    return this
+  }
+
+  // Id for building routes. Throws before init(), so a session that was never opened cannot call /api/session/.
+  private get boundId(): string {
+    if (!this.id) {
+      throw new Error("opencode session is not open; call init() first")
+    }
+
+    return this.id
+  }
 
   // Path of this session's routes, before any suffix.
   private get route(): string {
-    return `/api/session/${this.id}`
+    return `/api/session/${this.boundId}`
   }
 
   // Sends one request and throws on any failure status. `path` is relative to the server root.
@@ -72,7 +94,7 @@ export class OpencodeSession implements OpencodeSessionHandleInterface {
   async waitForIdle(timeoutMs: number): Promise<boolean> {
     try {
       // This route is still under /api/experimental in opencode v2.
-      await this.call("POST", `/api/experimental/session/${this.id}/wait`, { signal: AbortSignal.timeout(timeoutMs) })
+      await this.call("POST", `/api/experimental/session/${this.boundId}/wait`, { signal: AbortSignal.timeout(timeoutMs) })
     } catch (err) {
       if (err instanceof DOMException && err.name === "TimeoutError") {
         return false
