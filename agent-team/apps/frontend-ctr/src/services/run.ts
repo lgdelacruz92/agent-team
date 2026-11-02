@@ -2,6 +2,7 @@
 // Each tick advances the run by reading the board, so a restart in the middle of a run loses nothing.
 import { Snapshot } from "../interfaces/snapshot.interface.js"
 import type { OpencodeAgent } from "../interfaces/opencode-agent.interface.js"
+import type { VikunjaTask } from "../interfaces/vikunja.interface.js"
 import { Vikunja } from "./vikunja.js"
 
 const log = (...args: unknown[]) => console.log(new Date().toISOString(), ...args)
@@ -42,6 +43,19 @@ export class Controller {
     return { ...this.snapshot, paused: this.paused }
   }
 
+  // The prompt for an agent: the ticket and the branch to work on, as the agents' instructions expect.
+  private taskPrompt(task: VikunjaTask): string {
+    const slug = task.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+
+    return [
+      `Ticket #${task.id}: ${task.title}`,
+      "",
+      task.description,
+      "",
+      `Branch: ticket-${task.id}-${slug}`,
+    ].join("\n")
+  }
+
   // Runs one tick. Returns false when a tick was already in progress and this call was ignored.
   async tick(): Promise<boolean> {
     if (this.busy) {
@@ -58,8 +72,27 @@ export class Controller {
       }
 
       const unblockedTasks = await this.vikunja.listUnblockedReadyTasks()
-      console.log(unblockedTasks)
-      // pass to front end
+
+      // Hand one task to each idle agent. A task goes to one agent only, so it leaves the list once given.
+      for (const agent of this.agents) {
+        if (unblockedTasks.length === 0) {
+          break
+        }
+
+        try {
+          if ((await agent.state()) !== "idle") {
+            continue
+          }
+
+          const task = unblockedTasks.shift() as VikunjaTask
+          const session = await agent.createSession(`#${task.id} ${task.title}`)
+          await agent.prompt(session.id, this.taskPrompt(task))
+          log(`gave #${task.id} to ${agent.name} (session ${session.id})`)
+        } catch (err) {
+          // One agent failing must not stop the others from getting work.
+          log(`could not give a task to ${agent.name}:`, messageOf(err))
+        }
+      }
 
     } catch (err) {
       log("tick failed:", messageOf(err))
