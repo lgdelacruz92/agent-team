@@ -1,4 +1,4 @@
-// Client for one opencode agent server. state() is implemented; the other methods are still stubs.
+// Client for one opencode agent server. state() and clearSessions() are implemented; the other methods are still stubs.
 import { config } from "../config.js"
 import type {
   OpencodeAgentInterface,
@@ -89,8 +89,42 @@ export class OpencodeAgent implements OpencodeAgentInterface {
     throw new Error("Method not implemented.")
   }
 
+  // Lists the ids of the sessions on the first page of GET /api/session. Throws when the server does not answer.
+  private async listSessionIds(): Promise<string[]> {
+    const res = await fetch(`${this.baseUrl}/api/session`, {
+      headers: this.headers(),
+      signal: AbortSignal.timeout(config.opencodeTimeoutMs),
+    })
+
+    if (!res.ok) {
+      throw new Error(`opencode ${this.name} GET /api/session returned ${res.status}`)
+    }
+
+    const body = (await res.json()) as { data: { id: string }[] }
+
+    return body.data.map((session) => session.id)
+  }
+
   // Deletes every session of the agent.
-  clearSessions(): Promise<void> {
-    throw new Error("Method not implemented.")
+  // The list is paged, so it deletes the page it got and lists again until nothing is left.
+  async clearSessions(): Promise<void> {
+    let ids = await this.listSessionIds()
+
+    while (ids.length > 0) {
+      for (const id of ids) {
+        const res = await fetch(`${this.baseUrl}/api/session/${id}`, {
+          method: "DELETE",
+          headers: this.headers(),
+          signal: AbortSignal.timeout(config.opencodeTimeoutMs),
+        })
+
+        // A session that is already gone is what we wanted; any other failure stops the loop so it cannot spin.
+        if (!res.ok && res.status !== 404) {
+          throw new Error(`opencode ${this.name} DELETE /api/session/${id} returned ${res.status}`)
+        }
+      }
+
+      ids = await this.listSessionIds()
+    }
   }
 }

@@ -106,3 +106,83 @@ describe("OpencodeAgent.state", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("http://other.test/api/session")
   })
 })
+
+describe("OpencodeAgent.clearSessions", () => {
+  // Replaces fetch with a stub that answers each call with the next reply, in order.
+  const stubReplies = (...replies: { status: number; body?: unknown }[]) => {
+    const fetchMock = vi.fn()
+
+    for (const reply of replies) {
+      fetchMock.mockResolvedValueOnce({
+        ok: reply.status >= 200 && reply.status < 300,
+        status: reply.status,
+        json: async () => reply.body,
+      })
+    }
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    return fetchMock
+  }
+
+  const page = (...ids: string[]) => ({ status: 200, body: { data: ids.map((id) => ({ id })) } })
+
+  it("does nothing when there are no sessions", async () => {
+    const fetchMock = stubReplies(page())
+
+    await new OpencodeAgent("frontend").clearSessions()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("deletes every session on the page, then lists again to confirm none are left", async () => {
+    const fetchMock = stubReplies(page("ses_1", "ses_2"), { status: 200 }, { status: 200 }, page())
+
+    await new OpencodeAgent("frontend").clearSessions()
+
+    const calls = fetchMock.mock.calls.map(([url, init]) => `${init?.method ?? "GET"} ${url}`)
+    expect(calls).toEqual([
+      "GET http://opencode.test/api/session",
+      "DELETE http://opencode.test/api/session/ses_1",
+      "DELETE http://opencode.test/api/session/ses_2",
+      "GET http://opencode.test/api/session",
+    ])
+  })
+
+  it("keeps going through further pages until the list is empty", async () => {
+    const fetchMock = stubReplies(page("ses_1"), { status: 200 }, page("ses_2"), { status: 200 }, page())
+
+    await new OpencodeAgent("frontend").clearSessions()
+
+    expect(fetchMock).toHaveBeenCalledTimes(5)
+  })
+
+  it("sends basic auth on every request", async () => {
+    const fetchMock = stubReplies(page("ses_1"), { status: 200 }, page())
+
+    await new OpencodeAgent("frontend").clearSessions()
+
+    const expected = `Basic ${Buffer.from("opencode:secret").toString("base64")}`
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(init.headers.Authorization).toBe(expected)
+    }
+  })
+
+  it("treats a session that is already gone as deleted", async () => {
+    stubReplies(page("ses_1"), { status: 404 }, page())
+
+    await expect(new OpencodeAgent("frontend").clearSessions()).resolves.toBeUndefined()
+  })
+
+  it("throws when a delete fails, instead of looping forever", async () => {
+    stubReplies(page("ses_1"), { status: 500 })
+
+    await expect(new OpencodeAgent("frontend").clearSessions()).rejects.toThrow("returned 500")
+  })
+
+  it("throws when the session list cannot be read", async () => {
+    stubReplies({ status: 500 })
+
+    await expect(new OpencodeAgent("frontend").clearSessions()).rejects.toThrow("returned 500")
+  })
+})
