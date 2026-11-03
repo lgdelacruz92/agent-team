@@ -82,7 +82,7 @@ export class TaskScheduler {
       return
     }
 
-    const readyTasks = await this.taskManager.getReadyTasks()
+    const readyTasks = await this.taskManager.getTasks()
     const task = readyTasks.find((candidate) => !this.dispatched.has(candidate.id))
 
     if (!task) {
