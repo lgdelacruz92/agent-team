@@ -95,6 +95,18 @@ class FakeAgent implements OpencodeAgentInterface {
 describe("OpencodeWorker", () => {
   workerContract("OpencodeWorker", () => new OpencodeWorker("frontend-1", ["react"], new FakeAgent()))
 
+  it("uses the ticket id in the session title and prompt", async () => {
+    const agent = new FakeAgent()
+    const createSession = vi.spyOn(agent, "createSession")
+    const prompt = vi.spyOn(agent, "prompt")
+    const worker = new OpencodeWorker("frontend-1", ["react"], agent)
+
+    await worker.create({ ticketId: 42, title: "Add feature", description: "Details" })
+
+    expect(createSession).toHaveBeenCalledWith("#42 Add feature")
+    expect(prompt).toHaveBeenCalledWith("ses_1", "Ticket #42: Add feature\n\nDetails\n\nBranch: ticket-42-add-feature")
+  })
+
   it("is not available when the agent is unreachable", async () => {
     const agent = new FakeAgent()
 

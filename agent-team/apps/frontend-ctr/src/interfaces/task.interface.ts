@@ -4,7 +4,7 @@
 // A task that is ready to be worked on.
 export interface TaskInterface {
   // Unique within its source. Used to name the session and the branch.
-  readonly id: string | number
+  readonly ticketId: string | number
 
   // Short name of the task.
   readonly title: string

@@ -89,7 +89,7 @@ export class TaskScheduler {
     }
 
     const readyTasks = await this.taskManager.getTasks()
-    const task = readyTasks.find((candidate) => !this.dispatched.has(candidate.id))
+    const task = readyTasks.find((candidate) => !this.dispatched.has(candidate.ticketId))
 
     if (!task) {
       return
@@ -100,10 +100,10 @@ export class TaskScheduler {
 
     this.workers.splice(this.workers.indexOf(worker), 1)
     this.busyWorkers.push(worker)
-    this.dispatched.add(task.id)
+    this.dispatched.add(task.ticketId)
     this.sessions.set(worker.id, sessionId)
 
-    log(`task ${task.id} -> worker ${worker.id}`)
+    log(`task ${task.ticketId} -> worker ${worker.id}`)
   }
 
   // The first worker that is available: reachable and not working on a session.

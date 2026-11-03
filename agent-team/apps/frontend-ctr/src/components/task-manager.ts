@@ -10,7 +10,7 @@ import type { VikunjaColumn, VikunjaTaskInterface } from "../interfaces/vikunja.
 // Converts a Vikunja ticket into the shape the scheduler and workers use.
 const toTask = (ticket: VikunjaTaskInterface): TaskInterface => {
   return {
-    id: ticket.id,
+    ticketId: ticket.id,
     title: ticket.title,
     description: ticket.description,
   }

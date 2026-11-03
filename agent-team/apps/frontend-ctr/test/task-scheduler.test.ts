@@ -31,7 +31,7 @@ const makeWorker = (id: string) => {
 
 describe("TaskScheduler", () => {
   it("waits for busy workers and returns all available workers to the pool", async () => {
-    const tasks: TaskInterface[] = [1, 2, 3, 4].map((id) => ({ id, title: `Task ${id}`, description: "" }))
+    const tasks: TaskInterface[] = [1, 2, 3, 4].map((ticketId) => ({ ticketId, title: `Task ${ticketId}`, description: "" }))
     const getTasks = vi.fn(async () => tasks)
     const taskManager: TaskManagerInterface = {
       getTasks,

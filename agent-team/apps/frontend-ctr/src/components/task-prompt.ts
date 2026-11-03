@@ -6,10 +6,10 @@ export const taskPrompt = (task: TaskInterface): string => {
   const slug = task.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
 
   return [
-    `Ticket #${task.id}: ${task.title}`,
+    `Ticket #${task.ticketId}: ${task.title}`,
     "",
     task.description,
     "",
-    `Branch: ticket-${task.id}-${slug}`,
+    `Branch: ticket-${task.ticketId}-${slug}`,
   ].join("\n")
 }

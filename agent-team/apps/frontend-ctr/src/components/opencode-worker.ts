@@ -29,7 +29,7 @@ export class OpencodeWorker implements WorkerInterface {
 
   // Opens a session, sends the ticket prompt and returns the session id to store on the ticket.
   async create(task: TaskInterface): Promise<string> {
-    const session = await this.agent.createSession(`#${task.id} ${task.title}`)
+    const session = await this.agent.createSession(`#${task.ticketId} ${task.title}`)
 
     this.sessionIds.add(session.id)
 

@@ -2,17 +2,14 @@
 // rely on the behaviour below without knowing which worker it holds. It is not a *.test.ts file on purpose:
 // vitest only runs it when an implementation's own test file calls workerContract().
 import { describe, expect, it } from "vitest"
-import type { VikunjaTaskInterface } from "../src/interfaces/vikunja.interface.js"
+import type { TaskInterface } from "../src/interfaces/task.interface.js"
 import type { WorkerInterface } from "../src/interfaces/worker.interface.js"
 
 // A minimal ticket to start a run with. Only the fields the prompt is built from matter.
-const task: VikunjaTaskInterface = {
-  id: 1,
+const task: TaskInterface = {
+  ticketId: 1,
   title: "Contract test ticket",
   description: "Does nothing. Used to open a session.",
-  done: false,
-  due_date: "",
-  labels: [],
 }
 
 // Runs the WorkerInterface contract against the worker that `makeWorker` returns.
