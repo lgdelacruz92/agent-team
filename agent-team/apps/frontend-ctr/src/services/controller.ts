@@ -89,7 +89,7 @@ export class Controller {
                 const stale = await agent.isStale();
                 if (stale) {
                   task.retry();
-                } else {x
+                } else {
                   const busy = await agent.isBusy();
                   if (busy) {
                     const progressing = await agent.isProgessing();
