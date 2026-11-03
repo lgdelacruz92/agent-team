@@ -5,9 +5,6 @@ import { config } from "../config.js"
 import type { VikunjaServiceInterface } from "../interfaces/vikunja.service.interface.js"
 import type { VikunjaBucketInterface, VikunjaTaskInterface } from "../interfaces/vikunja.types.js"
 
-// Maximum tasks Vikunja returns per request, so a column is not silently cut at the default page size.
-const _perPage = 200
-
 // Reads tasks from the bound project's kanban board.
 export class VikunjaService implements VikunjaServiceInterface {
   constructor(
@@ -16,6 +13,7 @@ export class VikunjaService implements VikunjaServiceInterface {
     private readonly timeoutMs: number = config.vikunjaTimeoutMs,
     private readonly projectId: number = config.projectId,
     private readonly viewId: number = config.viewId,
+    private readonly perPage: number = config.perPage,
   ) {}
 
   // Returns the tasks in the kanban column whose title matches `column` (case-insensitive).
@@ -37,7 +35,7 @@ export class VikunjaService implements VikunjaServiceInterface {
 
   // Loads every bucket of the kanban view, each with its tasks.
   private async listBuckets(): Promise<VikunjaBucketInterface[]> {
-    const path = `/projects/${this.projectId}/views/${this.viewId}/tasks?per_page=${_perPage}`
+    const path = `/projects/${this.projectId}/views/${this.viewId}/tasks?per_page=${this.perPage}`
 
     const res = await fetch(`${this.baseUrl}/api/v1${path}`, {
       headers: { Authorization: `Bearer ${this.token}` },
