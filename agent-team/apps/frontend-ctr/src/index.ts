@@ -1,7 +1,7 @@
 // Entry point: the HTTP surface for operating the controller, and the polling loop.
 import express from "express"
 import { config } from "./config.js"
-import { Controller } from "./services/run.js"
+import { Controller } from "./services/controller.js"
 
 const controller = new Controller()
 const app = express()
