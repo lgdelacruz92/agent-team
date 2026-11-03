@@ -74,26 +74,41 @@ export class Controller {
         return true
       }
 
-      const unblockedTasks = await this.vikunja.listUnblockedReadyTasks()
+      deleteCleanupQueue();
 
-      // Hand one task to each idle agent. A task goes to one agent only, so it leaves the list once given.
-      for (const agent of this.agents) {
-        if (unblockedTasks.length === 0) {
-          break
-        }
-
-        try {
-          if ((await agent.state()) !== "idle") {
-            continue
+      const tasks = await this.vikunja.getInProgress();
+      if (tasks.length > 0) {
+        for (const task of tasks) {
+          for (let agent of this.agents) {
+            const alive = await agent.isAlive();
+            if (alive) {
+              const done = await agent.isDone();
+              if (done) {
+                task.finished()
+              } else {
+                const stale = await agent.isStale();
+                if (stale) {
+                  task.retry();
+                } else {x
+                  const busy = await agent.isBusy();
+                  if (busy) {
+                    const progressing = await agent.isProgessing();
+                    if (progressing) {
+                      continue
+                    } else {
+                      task.retry();
+                    }
+                  }
+                }
+              }
+            }
           }
-
-          const task = unblockedTasks.shift() as VikunjaTaskInterface
-          const session = await agent.createSession(`#${task.id} ${task.title}`)
-          await agent.prompt(session.id, this.taskPrompt(task))
-          log(`gave #${task.id} to ${agent.name} (session ${session.id})`)
-        } catch (err) {
-          // One agent failing must not stop the others from getting work.
-          log(`could not give a task to ${agent.name}:`, messageOf(err))
+        }
+      } else {
+        const unblockedTasks = await this.vikunja.listUnblockedReadyTasks();
+        if (unblockedTasks.length > 0) {
+          const prompt = this.taskPrompt(unblockedTasks[0]);
+          // will implement
         }
       }
     } catch (err) {
@@ -105,3 +120,7 @@ export class Controller {
     return true
   }
 }
+function deleteCleanupQueue() {
+  throw new Error("Function not implemented.")
+}
+
