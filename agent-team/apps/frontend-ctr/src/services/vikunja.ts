@@ -5,7 +5,7 @@ import type {
   VikunjaCommentInterface,
   VikunjaTaskInterface,
   VikunjaViewInterface,
-} from "../interfaces/vikunja.interface.js"
+} from "../interfaces/vikunja.types.js"
 
 // An HTTP failure from Vikunja, with its status code.
 export class HttpError extends Error {

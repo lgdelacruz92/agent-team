@@ -29,6 +29,7 @@ const _vikunjaUrl = trimSlash(process.env.VIKUNJA_URL ?? "http://host.docker.int
 const _vikunjaToken = process.env.VIKUNJA_API_TOKEN ?? ""
 const _vikunjaTimeoutMs = readNumber(process.env.VIKUNJA_TIMEOUT_MS, 30_000)
 const _projectId = readNumber(process.env.CTR_PROJECT_ID, 0)
+const _viewId = readNumber(process.env.CTR_VIEW_ID, 12)
 
 // Frontend worker (opencode server)
 const _opencodeUrl = trimSlash(process.env.FRONTEND_URL ?? "http://opencode-frontend:4096")
@@ -63,6 +64,9 @@ export const config = {
   vikunjaToken: _vikunjaToken,
   vikunjaTimeoutMs: _vikunjaTimeoutMs,
   projectId: _projectId,
+
+  // The controller is bound to a single kanban view of the project (CTR_VIEW_ID, default 12).
+  viewId: _viewId,
 
   opencodeUrl: _opencodeUrl,
   opencodeUser: _opencodeUser,
