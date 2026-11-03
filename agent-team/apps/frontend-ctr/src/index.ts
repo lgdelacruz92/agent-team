@@ -2,8 +2,14 @@
 import express from "express"
 import { config } from "./config.js"
 import { Controller } from "./services/controller.js"
+import { OpencodeAgent } from "./services/opencode-agent.js"
+import { Vikunja } from "./services/vikunja.js"
 
-const controller = new Controller()
+// The Vikunja client and the agents are built here and handed to the controller.
+// One agent for now: the frontend worker, at the configured opencode URL.
+const vikunja = new Vikunja()
+const agents = [new OpencodeAgent("frontend")]
+const controller = new Controller(agents, vikunja)
 const app = express()
 
 // Liveness, for the compose healthcheck.
