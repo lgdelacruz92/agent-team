@@ -1,11 +1,11 @@
-// Contract for a worker the Controller schedules tickets onto. The Controller only talks to workers through
+// Contract for a worker the scheduler schedules tickets onto. The Controller only talks to workers through
 // this, so adding a worker is a config change and the scheduling code does not change.
-import type { VikunjaTaskInterface } from "./vikunja.interface.js"
+import type { TaskInterface } from "./task.interface.js"
 
-// A worker the Controller can start a ticket on, watch while it runs and clean up after.
+// A worker the scheduler can start a ticket on, watch while it runs and clean up after.
 // One worker runs one ticket at a time, so a session id is enough to address its work.
 export interface WorkerInterface {
-  // Unique name, such as "frontend-1". Stored on the ticket so the Controller finds the worker again after a restart.
+  // Unique name, such as "frontend-1". Stored on the ticket so the scheduler finds the worker again after a restart.
   readonly id: string
 
   // What this worker can do. Matched against what a ticket needs when picking a free worker.
@@ -29,7 +29,7 @@ export interface WorkerInterface {
   isProgressing(sessionId: string): Promise<boolean>
 
   // Opens a session for the ticket, sends its prompt and returns the session id to store on the ticket.
-  create(task: VikunjaTaskInterface): Promise<string>
+  create(task: TaskInterface): Promise<string>
 
   // Stops the turn in progress. The session keeps its context.
   abort(sessionId: string): Promise<void>

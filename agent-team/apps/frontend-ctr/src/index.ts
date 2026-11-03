@@ -1,19 +1,21 @@
 // Entry point: the HTTP surface for operating the controller, and the polling loop.
 import express from "express"
 import { config } from "./config.js"
-import { Controller } from "./services/controller.js"
+import { TaskScheduler } from "./services/task-scheduler.js"
 import { OpencodeAgent } from "./services/opencode-agent.js"
-import { Vikunja } from "./services/vikunja.js"
+import type { TaskInterface } from "./interfaces/task.interface.js"
+import type { WorkerInterface } from "./interfaces/worker.interface.js"
 import { OpencodeWorker } from "./components/opencode-worker.js"
 
-// The Vikunja client and the agents are built here and handed to the controller.
-// One agent for now: the frontend worker, at the configured opencode URL.
-const vikunja = new Vikunja()
+// The workers and the ready queue are built here and handed to the scheduler.
+// One worker for now: the frontend worker, at the configured opencode URL.
+// Whatever fetches tasks (Vikunja or anything else) pushes them into `ready`; the scheduler does not care who.
+const ready: TaskInterface[] = []
 
 const agent = new OpencodeAgent(config.opencodeUser, [], config.opencodeUrl);
-const workers = []
+const workers: WorkerInterface[] = []
 workers.push(new OpencodeWorker(config.opencodeUser, ['react'], agent));
-const controller = new Controller(workers, vikunja)
+const controller = new TaskScheduler(workers, [])
 const app = express()
 
 // Liveness, for the compose healthcheck.

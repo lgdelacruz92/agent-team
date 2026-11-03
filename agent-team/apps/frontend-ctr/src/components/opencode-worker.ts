@@ -2,7 +2,7 @@
 // (done, stale, busy, progressing) by reading the agent, and starts and stops sessions on it.
 import { config } from "../config.js"
 import type { OpencodeAgentInterface } from "../interfaces/opencode-agent.interface.js"
-import type { VikunjaTaskInterface } from "../interfaces/vikunja.interface.js"
+import type { TaskInterface } from "../interfaces/task.interface.js"
 import type { WorkerInterface } from "../interfaces/worker.interface.js"
 import { OpencodeAgent } from "../services/opencode-agent.js"
 import { taskPrompt } from "./task-prompt.js"
@@ -70,7 +70,7 @@ export class OpencodeWorker implements WorkerInterface {
   }
 
   // Opens a session, sends the ticket prompt and returns the session id to store on the ticket.
-  async create(task: VikunjaTaskInterface): Promise<string> {
+  async create(task: TaskInterface): Promise<string> {
     const session = await this.agent.createSession(`#${task.id} ${task.title}`)
 
     this.sessionIds.add(session.id)
