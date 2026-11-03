@@ -14,3 +14,4 @@ agent-team/apps/workspace/cto-token-report.*.txt
 **/*/*.tgz
 **/*/workspace/
 **/playground/
+.vscode
