@@ -38,11 +38,24 @@ export const workerContract = (name: string, makeWorker: () => WorkerInterface |
       })
     })
 
-    describe("isAlive", () => {
+    describe("isAvailable", () => {
       it("answers with a boolean and does not throw, so an outage is a value and not an error", async () => {
         const worker = await makeWorker()
 
-        expect(typeof (await worker.isAlive())).toBe("boolean")
+        expect(typeof (await worker.isAvailable())).toBe("boolean")
+      })
+
+      it("is not available while a ticket is running, and is again after abort", async () => {
+        const worker = await makeWorker()
+        const sessionId = await worker.create(task)
+
+        expect(await worker.isAvailable()).toBe(false)
+
+        await worker.abort(sessionId)
+
+        expect(await worker.isAvailable()).toBe(true)
+
+        await worker.delete(sessionId)
       })
     })
 
@@ -69,68 +82,13 @@ export const workerContract = (name: string, makeWorker: () => WorkerInterface |
       })
     })
 
-    describe("checks on a session", () => {
-      it("answers every check with a boolean", async () => {
-        const worker = await makeWorker()
-        const sessionId = await worker.create(task)
-
-        expect(typeof (await worker.isDone(sessionId))).toBe("boolean")
-        expect(typeof (await worker.isStale(sessionId, Date.now()))).toBe("boolean")
-        expect(typeof (await worker.isBusy(sessionId))).toBe("boolean")
-        expect(typeof (await worker.isProgressing(sessionId))).toBe("boolean")
-
-        await worker.delete(sessionId)
-      })
-
-      it("is never both done and busy, because done means the session is idle", async () => {
-        const worker = await makeWorker()
-        const sessionId = await worker.create(task)
-        const done = await worker.isDone(sessionId)
-        const busy = await worker.isBusy(sessionId)
-
-        expect(done && busy).toBe(false)
-
-        await worker.delete(sessionId)
-      })
-
-      it("is not done right after create, because the agent has not answered yet", async () => {
-        const worker = await makeWorker()
-        const sessionId = await worker.create(task)
-
-        expect(await worker.isDone(sessionId)).toBe(false)
-
-        await worker.delete(sessionId)
-      })
-    })
-
-    describe("isStale", () => {
-      it("is not stale when the run has only just started", async () => {
-        const worker = await makeWorker()
-        const sessionId = await worker.create(task)
-
-        expect(await worker.isStale(sessionId, Date.now())).toBe(false)
-
-        await worker.delete(sessionId)
-      })
-
-      it("is stale when the run started far longer ago than any time budget", async () => {
-        const worker = await makeWorker()
-        const sessionId = await worker.create(task)
-        const tenYearsMs = 10 * 365 * 24 * 60 * 60 * 1000
-
-        expect(await worker.isStale(sessionId, Date.now() - tenYearsMs)).toBe(true)
-
-        await worker.delete(sessionId)
-      })
-    })
-
     describe("abort", () => {
       it("stops the turn and leaves the session usable for the checks", async () => {
         const worker = await makeWorker()
         const sessionId = await worker.create(task)
 
         await expect(worker.abort(sessionId)).resolves.toBeUndefined()
-        await expect(worker.isBusy(sessionId)).resolves.toBe(false)
+        await expect(worker.isAvailable()).resolves.toBe(true)
 
         await worker.delete(sessionId)
       })

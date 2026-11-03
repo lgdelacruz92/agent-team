@@ -98,20 +98,12 @@ export class TaskScheduler {
     log(`task ${task.id} -> worker ${worker.id}`)
   }
 
-  // The first worker that is reachable and not working on a session.
+  // The first worker that is available: reachable and not working on a session.
   private async findFreeWorker(): Promise<WorkerInterface | null> {
     for (const worker of this.workers) {
-      if (!(await worker.isAlive())) {
-        continue
+      if (await worker.isAvailable()) {
+        return worker
       }
-
-      const sessionId = this.sessions.get(worker.id)
-
-      if (sessionId && (await worker.isBusy(sessionId))) {
-        continue
-      }
-
-      return worker
     }
 
     return null

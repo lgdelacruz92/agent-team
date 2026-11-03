@@ -11,22 +11,9 @@ export interface WorkerInterface {
   // What this worker can do. Matched against what a ticket needs when picking a free worker.
   readonly skills: string[]
 
-  // True when the worker's server answers within the time limit. False means an outage, not a task failure.
-  isAlive(): Promise<boolean>
-
-  // True when the session is idle and the agent has answered the prompt, so its reply is ready to post.
-  isDone(sessionId: string): Promise<boolean>
-
-  // True when the run has used up its time budget, counted from startedAt (epoch milliseconds),
-  // whatever the agent is doing. startedAt comes from the ticket, so the worker holds no clock of its own.
-  isStale(sessionId: string, startedAt: number): Promise<boolean>
-
-  // True when the session is working right now. False for a session that has not started yet.
-  isBusy(sessionId: string): Promise<boolean>
-
-  // True when the session produced something recently, judged from the time of its newest message.
-  // Only meaningful while the session is busy: a busy session that is not progressing is stuck.
-  isProgressing(sessionId: string): Promise<boolean>
+  // True when the worker can take a new ticket now: its server answers and it is not working on a session.
+  // False covers both an outage and a busy worker; the scheduler only needs to know whether to skip it.
+  isAvailable(): Promise<boolean>
 
   // Opens a session for the ticket, sends its prompt and returns the session id to store on the ticket.
   create(task: TaskInterface): Promise<string>

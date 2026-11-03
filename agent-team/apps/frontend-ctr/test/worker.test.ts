@@ -1,4 +1,4 @@
-import { describe } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { OpencodeWorker } from "../src/components/opencode-worker.js"
 import type {
   OpencodeAgentInterface,
@@ -23,6 +23,18 @@ class FakeAgent implements OpencodeAgentInterface {
     }
 
     return "idle"
+  }
+
+  async isDone(sessionId: string): Promise<boolean> {
+    return !this.busy.has(sessionId) && this.known(sessionId).length > 0
+  }
+
+  async isStale(_sessionId: string, _startedAt: number): Promise<boolean> {
+    return false
+  }
+
+  async isProgressing(_sessionId: string): Promise<boolean> {
+    return true
   }
 
   async createSession(_title: string): Promise<OpencodeSessionInterface> {
@@ -82,4 +94,14 @@ class FakeAgent implements OpencodeAgentInterface {
 
 describe("OpencodeWorker", () => {
   workerContract("OpencodeWorker", () => new OpencodeWorker("frontend-1", ["react"], new FakeAgent()))
+
+  it("is not available when the agent is unreachable", async () => {
+    const agent = new FakeAgent()
+
+    vi.spyOn(agent, "state").mockResolvedValue("unreachable")
+
+    const worker = new OpencodeWorker("frontend-1", ["react"], agent)
+
+    expect(await worker.isAvailable()).toBe(false)
+  })
 })

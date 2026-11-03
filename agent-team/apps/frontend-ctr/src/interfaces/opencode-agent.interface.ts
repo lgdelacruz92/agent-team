@@ -26,6 +26,17 @@ export interface OpencodeAgentInterface {
   // Reports whether the agent can take work now.
   state(): Promise<OpencodeAgentState>
 
+  // True when the session is idle and the agent has answered the prompt, so its reply is ready to post.
+  isDone(sessionId: string): Promise<boolean>
+
+  // True when the run has used up its time budget, counted from startedAt (epoch milliseconds),
+  // whatever the agent is doing. startedAt comes from the ticket, so the agent holds no clock of its own.
+  isStale(sessionId: string, startedAt: number): Promise<boolean>
+
+  // True when the session produced something recently, judged from the time of its newest message.
+  // Only meaningful while the agent is busy: a busy session that is not progressing is stuck.
+  isProgressing(sessionId: string): Promise<boolean>
+
   // Opens a new session for one ticket.
   createSession(title: string): Promise<OpencodeSessionInterface>
 

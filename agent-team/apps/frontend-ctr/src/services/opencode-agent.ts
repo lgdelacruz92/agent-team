@@ -16,6 +16,12 @@ interface OpencodeSessionRecord {
   time: { busy?: number; idle?: number }
 }
 
+// Milliseconds in a minute, to turn the configured run budget into the same unit as Date.now().
+const msPerMinute = 60_000
+
+// How long isDone() waits for the session to go idle. Short, so one slow session cannot hold up a tick.
+const idleCheckMs = 1000
+
 // An opencode agent the Controller can hand tickets to, identified by its name.
 export class OpencodeAgent implements OpencodeAgentInterface {
   // The sessions this agent is working on, found by id for prompt, wait, abort and messages.
@@ -74,6 +80,37 @@ export class OpencodeAgent implements OpencodeAgentInterface {
     }
 
     return "idle"
+  }
+
+  // Done when the session is idle and the last message is the agent's reply, so there is a reply to post.
+  // A session that was just prompted is idle for a moment with the user's prompt as its last message: not done yet.
+  async isDone(sessionId: string): Promise<boolean> {
+    const idle = await this.waitForIdle(sessionId, idleCheckMs)
+
+    if (!idle) {
+      return false
+    }
+
+    const messages = await this.messages(sessionId)
+    const last = messages[messages.length - 1]
+
+    if (!last) {
+      return false
+    }
+
+    return last.role === "assistant"
+  }
+
+  // Stale when the run has used up its budget, whatever the agent is doing. The clock starts at startedAt,
+  // which the Controller stored on the ticket, so this agent keeps no clock of its own.
+  async isStale(_sessionId: string, startedAt: number): Promise<boolean> {
+    return Date.now() - startedAt > config.maxRunMin * msPerMinute
+  }
+
+  // Placeholder until messages carry a timestamp: always progressing, so a stuck session is caught by isStale()
+  // at the end of its budget instead. Replace with "newest message is younger than the threshold".
+  async isProgressing(_sessionId: string): Promise<boolean> {
+    return true
   }
 
   // Opens a new session for one ticket.
