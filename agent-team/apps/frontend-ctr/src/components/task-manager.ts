@@ -20,6 +20,15 @@ const toTask = (ticket: VikunjaTaskInterface): TaskInterface => {
 export class TaskManager implements TaskManagerInterface {
   constructor(private readonly vikunja: VikunjaServiceInterface) {}
 
+  // Tasks a worker can pick up now: the unblocked tasks in Ready followed by the tasks in Retry.
+  // Retry tasks are not checked for blockers: they were already started once.
+  async getTasks(): Promise<TaskInterface[]> {
+    const ready = await this.vikunja.getReadyUnblockedTickets()
+    const retry = await this.vikunja.getTickets(config.buckets.retry)
+
+    return [...ready, ...retry].map(toTask)
+  }
+
   // Tasks waiting to be started.
   getReadyTasks(): Promise<TaskInterface[]> {
     return this.tasksIn(config.buckets.ready)
@@ -47,7 +56,7 @@ export class TaskManager implements TaskManagerInterface {
 
   // Reads one kanban column through the service and converts its tickets, in the order Vikunja returns them.
   private async tasksIn(column: string): Promise<TaskInterface[]> {
-    const tickets = await this.vikunja.getTasks(column)
+    const tickets = await this.vikunja.getTickets(column)
 
     return tickets.map(toTask)
   }

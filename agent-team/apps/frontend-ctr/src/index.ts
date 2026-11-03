@@ -3,19 +3,22 @@ import express from "express"
 import { config } from "./config.js"
 import { TaskScheduler } from "./services/task-scheduler.js"
 import { OpencodeAgent } from "./services/opencode-agent.js"
-import type { TaskInterface } from "./interfaces/task.interface.js"
+import { VikunjaService } from "./services/vikunja.service.js"
 import type { WorkerInterface } from "./interfaces/worker.interface.js"
 import { OpencodeWorker } from "./components/opencode-worker.js"
+import { TaskManager } from "./components/task-manager.js"
 
-// The workers and the ready queue are built here and handed to the scheduler.
+// The task manager and the workers are built here and handed to the scheduler.
+// The task manager reads tickets from Vikunja; the scheduler only sees TaskManagerInterface and does not care where they come from.
+const taskManager = new TaskManager(new VikunjaService())
+
 // One worker for now: the frontend worker, at the configured opencode URL.
-// Whatever fetches tasks (Vikunja or anything else) pushes them into `ready`; the scheduler does not care who.
-const ready: TaskInterface[] = []
-
 const agent = new OpencodeAgent(config.opencodeUser, [], config.opencodeUrl);
 const workers: WorkerInterface[] = []
 workers.push(new OpencodeWorker(config.opencodeUser, ['react'], agent));
-const controller = new TaskScheduler(workers, [])
+
+const controller = new TaskScheduler(taskManager, workers)
+
 const app = express()
 
 // Liveness, for the compose healthcheck.

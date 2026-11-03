@@ -1,7 +1,7 @@
 // Hands ready tasks to free workers. It knows nothing about where tasks come from or what the workers are:
-// it only sees TaskInterface and WorkerInterface.
+// it only sees TaskManagerInterface and WorkerInterface.
 import type { SnapshotInterface } from "../interfaces/snapshot.interface.js"
-import type { TaskInterface } from "../interfaces/task.interface.js"
+import type { TaskManagerInterface } from "../interfaces/taskmanager.interface.js"
 import type { WorkerInterface } from "../interfaces/worker.interface.js"
 
 // Logs a line prefixed with the current time.
@@ -36,11 +36,15 @@ export class TaskScheduler {
     skipped: [],
   }
 
-  // `ready` is the queue of tasks waiting to start, oldest first. It is shared, not copied, so whoever owns the
-  // array can push new tasks into it while the scheduler shifts them off.
+  // Ids of tasks already handed to a worker. A task stays in the Ready column after it is dispatched (nothing moves
+  // it yet), so without this the next tick would hand the same task to another worker. In memory only: a restart
+  // forgets it.
+  private readonly dispatched = new Set<string | number>()
+
+  // The scheduler asks the task manager for ready tasks whenever a worker is free, so it holds no queue of its own.
   constructor(
+    private readonly taskManager: TaskManagerInterface,
     private readonly workers: WorkerInterface[] = [],
-    private readonly ready: TaskInterface[] = [],
   ) {}
 
   // The current run, the ordered queue and the skipped tickets, for GET /status.
@@ -71,21 +75,24 @@ export class TaskScheduler {
 
   // Gives the next ready task to the first free worker. Does nothing when there is no task or no free worker.
   private async dispatchNext(): Promise<void> {
-    if (!this.ready.length) {
-      return
-    }
-
+    // Look for a worker first, so the task source is not queried when nobody could take the task.
     const worker = await this.findFreeWorker()
 
     if (!worker) {
       return
     }
 
-    // Peek first and remove only after create() succeeds, so a failed start leaves the task queued.
-    const task = this.ready[0]
+    const readyTasks = await this.taskManager.getReadyTasks()
+    const task = readyTasks.find((candidate) => !this.dispatched.has(candidate.id))
+
+    if (!task) {
+      return
+    }
+
+    // Remember the task only after create() succeeds, so a failed start leaves it eligible for the next tick.
     const sessionId = await worker.create(task)
 
-    this.ready.shift()
+    this.dispatched.add(task.id)
     this.sessions.set(worker.id, sessionId)
 
     log(`task ${task.id} -> worker ${worker.id}`)

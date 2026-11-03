@@ -6,6 +6,9 @@ import type { TaskInterface } from "./task.interface.js"
 
 // Supplies the tasks sitting in each kanban column, in the order the source returns them.
 export interface TaskManagerInterface {
+  // Tasks a worker can pick up now: the unblocked tasks in Ready followed by the tasks in Retry.
+  getTasks(): Promise<TaskInterface[]>
+
   // Tasks waiting to be started (config.buckets.ready).
   getReadyTasks(): Promise<TaskInterface[]>
 
