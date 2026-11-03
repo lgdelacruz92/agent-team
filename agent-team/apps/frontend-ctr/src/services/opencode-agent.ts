@@ -12,6 +12,7 @@ import { OpencodeSession } from "./opencode-session.js"
 
 // The part of a session record from GET /api/session that state() reads. Times are epoch milliseconds.
 interface OpencodeSessionRecord {
+  id: string
   time: { busy?: number; idle?: number }
 }
 
@@ -104,6 +105,17 @@ export class OpencodeAgent implements OpencodeAgentInterface {
   // Messages of a session, oldest first.
   messages(sessionId: string): Promise<OpencodeMessageInterface[]> {
     return this.session(sessionId).messages()
+  }
+
+  // Deletes one tracked session by id, then stops tracking it.
+  // Throws for an id this agent does not know. A failed delete throws and leaves the session tracked.
+  async deleteSession(sessionId: string): Promise<void> {
+    await this.session(sessionId).delete()
+
+    this.sessions.splice(
+      this.sessions.findIndex((session) => session.id === sessionId),
+      1,
+    )
   }
 
   // Lists the ids of the sessions this agent tracks.

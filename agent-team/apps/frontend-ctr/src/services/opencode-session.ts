@@ -43,6 +43,17 @@ export class OpencodeSession implements OpencodeSessionHandleInterface {
     return this
   }
 
+  // Binds a session that already exists on the server, for example one left over from an earlier run,
+  // so it can be driven or deleted without calling init().
+  static open(id: string, baseUrl: string = config.opencodeUrl): OpencodeSession {
+    const session = new OpencodeSession()
+
+    session.id = id
+    session.baseUrl = baseUrl
+
+    return session
+  }
+
   // Id for building routes. Throws before init(), so a session that was never opened cannot call /api/session/.
   private get boundId(): string {
     if (!this.id) {
