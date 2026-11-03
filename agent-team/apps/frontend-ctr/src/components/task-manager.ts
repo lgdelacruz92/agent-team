@@ -1,11 +1,11 @@
 // Turns Vikunja kanban tickets into TaskInterface objects the scheduler understands.
 // It is the bridge between the Vikunja service and the scheduler, so neither needs to know about the other.
 
-import { config } from "../config.js"
 import type { TaskInterface } from "../interfaces/task.interface.js"
 import type { TaskManagerInterface } from "../interfaces/taskmanager.interface.js"
 import type { VikunjaServiceInterface } from "../interfaces/vikunja.service.interface.js"
-import type { VikunjaTaskInterface } from "../interfaces/vikunja.types.js"
+import { vikunjaColumns } from "../interfaces/vikunja.types.js"
+import type { VikunjaColumn, VikunjaTaskInterface } from "../interfaces/vikunja.types.js"
 
 // Converts a Vikunja ticket into the shape the scheduler and workers use.
 const toTask = (ticket: VikunjaTaskInterface): TaskInterface => {
@@ -24,38 +24,38 @@ export class TaskManager implements TaskManagerInterface {
   // Retry tasks are not checked for blockers: they were already started once.
   async getTasks(): Promise<TaskInterface[]> {
     const ready = await this.vikunja.getReadyUnblockedTickets()
-    const retry = await this.vikunja.getTickets(config.buckets.retry)
+    const retry = await this.vikunja.getTickets(vikunjaColumns.retry)
 
     return [...ready, ...retry].map(toTask)
   }
 
   // Tasks waiting to be started.
   getReadyTasks(): Promise<TaskInterface[]> {
-    return this.tasksIn(config.buckets.ready)
+    return this.tasksIn(vikunjaColumns.ready)
   }
 
   // Tasks a worker is working on right now.
   getInProgressTasks(): Promise<TaskInterface[]> {
-    return this.tasksIn(config.buckets.inProgress)
+    return this.tasksIn(vikunjaColumns.inProgress)
   }
 
   // Tasks whose work is finished and waiting for review.
   getReviewTasks(): Promise<TaskInterface[]> {
-    return this.tasksIn(config.buckets.review)
+    return this.tasksIn(vikunjaColumns.review)
   }
 
   // Tasks that should be tried again.
   getRetryTasks(): Promise<TaskInterface[]> {
-    return this.tasksIn(config.buckets.retry)
+    return this.tasksIn(vikunjaColumns.retry)
   }
 
   // Tasks that are complete.
   getDoneTasks(): Promise<TaskInterface[]> {
-    return this.tasksIn(config.buckets.done)
+    return this.tasksIn(vikunjaColumns.done)
   }
 
   // Reads one kanban column through the service and converts its tickets, in the order Vikunja returns them.
-  private async tasksIn(column: string): Promise<TaskInterface[]> {
+  private async tasksIn(column: VikunjaColumn): Promise<TaskInterface[]> {
     const tickets = await this.vikunja.getTickets(column)
 
     return tickets.map(toTask)

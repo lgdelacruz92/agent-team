@@ -1,5 +1,17 @@
 // Types for the Vikunja REST client.
 
+// Kanban column titles used by the controller.
+export const vikunjaColumns = {
+  ready: "Ready",
+  inProgress: "In progress",
+  review: "Review",
+  retry: "Retry",
+  done: "Done",
+} as const
+
+// A column title accepted by the Vikunja service.
+export type VikunjaColumn = (typeof vikunjaColumns)[keyof typeof vikunjaColumns]
+
 // A label attached to a Vikunja task.
 export interface VikunjaLabelInterface {
   id: number

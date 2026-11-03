@@ -26,6 +26,10 @@ export class TaskScheduler {
   // The session each worker is running, by worker id. Needed to ask a worker whether it is still busy.
   private readonly sessions = new Map<string, string>()
 
+  // Workers that have been given a task, checked on each tick until they are available again.
+  private readonly busyWorkers: WorkerInterface[] = []
+  private readonly workers: WorkerInterface[]
+
   // State reported by status(); only the paused flag is live so far.
   private snapshot: SnapshotInterface = {
     paused: false,
@@ -44,8 +48,10 @@ export class TaskScheduler {
   // The scheduler asks the task manager for ready tasks whenever a worker is free, so it holds no queue of its own.
   constructor(
     private readonly taskManager: TaskManagerInterface,
-    private readonly workers: WorkerInterface[] = [],
-  ) {}
+    workers: WorkerInterface[] = [],
+  ) {
+    this.workers = [...workers]
+  }
 
   // The current run, the ordered queue and the skipped tickets, for GET /status.
   status(): SnapshotInterface {
@@ -92,6 +98,8 @@ export class TaskScheduler {
     // Remember the task only after create() succeeds, so a failed start leaves it eligible for the next tick.
     const sessionId = await worker.create(task)
 
+    this.workers.splice(this.workers.indexOf(worker), 1)
+    this.busyWorkers.push(worker)
     this.dispatched.add(task.id)
     this.sessions.set(worker.id, sessionId)
 
@@ -100,6 +108,14 @@ export class TaskScheduler {
 
   // The first worker that is available: reachable and not working on a session.
   private async findFreeWorker(): Promise<WorkerInterface | null> {
+    // Iterate over a copy so moving one worker does not skip the next busy worker.
+    for (const worker of [...this.busyWorkers]) {
+      if (await worker.isAvailable()) {
+        this.busyWorkers.splice(this.busyWorkers.indexOf(worker), 1)
+        this.workers.push(worker)
+      }
+    }
+
     for (const worker of this.workers) {
       if (await worker.isAvailable()) {
         return worker

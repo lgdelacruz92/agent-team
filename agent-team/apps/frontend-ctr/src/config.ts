@@ -86,13 +86,4 @@ export const config = {
 
   githubRepo: _githubRepo,
   githubToken: _githubToken,
-
-  // Kanban bucket titles, compared case-insensitively.
-  buckets: {
-    ready: "Ready",
-    inProgress: "In progress",
-    review: "Review",
-    retry: "Retry",
-    done: "Done",
-  },
 } as const
