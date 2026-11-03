@@ -25,10 +25,10 @@ export class Controller {
   private busy = false
 
   // The agents that tickets are handed to, and the Vikunja client. Both are injected so tests can pass fakes;
-  // the client defaults to the shared one.
+  // the client defaults to a new one built from config.
   constructor(
     private readonly agents: OpencodeAgentInterface[] = [],
-    private readonly vikunja: Vikunja = Vikunja.getInstance(),
+    private readonly vikunja: Vikunja = new Vikunja(),
   ) {}
 
   // State reported by status(); only the paused flag is live so far.

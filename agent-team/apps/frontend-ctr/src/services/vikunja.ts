@@ -1,4 +1,4 @@
-// REST client for Vikunja, exposed as a singleton: tasks, Kanban buckets and comments.
+// REST client for Vikunja, tasks, Kanban buckets and comments.
 import { config } from "../config.js"
 import type {
   VikunjaBucketInterface,
@@ -14,35 +14,18 @@ export class HttpError extends Error {
   }
 }
 
-// Talks to the Vikunja API. Use Vikunja.getInstance() so the whole process shares one client
-// and one write queue.
+// Talks to the Vikunja API. Not a singleton: each caller builds its own client, which defaults to the
+// settings in config. Each instance has its own write queue.
 export class Vikunja {
-  private static instance: Vikunja | null = null
-
   // Vikunja returns HTTP 500 on concurrent writes, so writes are chained and run one at a time.
   private writes: Promise<unknown> = Promise.resolve()
 
-  // Private so nothing can build a second client.
-  private constructor(
-    private readonly baseUrl: string,
-    private readonly token: string,
-    private readonly timeoutMs: number,
-    private readonly projectId: number,
+  constructor(
+    private readonly baseUrl: string = config.vikunjaUrl,
+    private readonly token: string = config.vikunjaToken,
+    private readonly timeoutMs: number = config.vikunjaTimeoutMs,
+    private readonly projectId: number = config.projectId,
   ) {}
-
-  // Returns the shared client, creating it from config on first use.
-  static getInstance(): Vikunja {
-    if (!Vikunja.instance) {
-      Vikunja.instance = new Vikunja(
-        config.vikunjaUrl,
-        config.vikunjaToken,
-        config.vikunjaTimeoutMs,
-        config.projectId,
-      )
-    }
-
-    return Vikunja.instance
-  }
 
   // Sends one request and returns the parsed JSON (null for 204).
   private async call<T>(method: string, path: string, body?: unknown): Promise<T> {
