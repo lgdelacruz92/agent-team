@@ -1,9 +1,10 @@
 // Run lifecycle: start, watch, wrap up, abort, finish.
 // Each tick advances the run by reading the board, so a restart in the middle of a run loses nothing.
 import type { SnapshotInterface } from "../interfaces/snapshot.interface.js"
-import type { OpencodeAgentInterface } from "../interfaces/opencode-agent.interface.js"
 import type { VikunjaTaskInterface } from "../interfaces/vikunja.interface.js"
 import { Vikunja } from "./vikunja.js"
+import { OpencodeWorker } from "../components/opencode-worker.js"
+import { WorkerInterface } from "../interfaces/worker.interface.js"
 
 // Logs a line prefixed with the current time.
 const log = (...args: unknown[]) => console.log(new Date().toISOString(), ...args)
@@ -27,7 +28,7 @@ export class Controller {
   // The agents that tickets are handed to, and the Vikunja client. Both are injected so tests can pass fakes;
   // the client defaults to a new one built from config.
   constructor(
-    private readonly agents: OpencodeAgentInterface[] = [],
+    private readonly workers: OpencodeWorker[] = [],
     private readonly vikunja: Vikunja = new Vikunja(),
   ) {}
 
@@ -74,43 +75,8 @@ export class Controller {
         return true
       }
 
-      deleteCleanupQueue();
+      const freeWorkers = await this.getFreeWorkers();
 
-      const tasks = await this.vikunja.getInProgress();
-      if (tasks.length > 0) {
-        for (const task of tasks) {
-          for (let agent of this.agents) {
-            const alive = await agent.isAlive();
-            if (alive) {
-              const done = await agent.isDone();
-              if (done) {
-                task.finished()
-              } else {
-                const stale = await agent.isStale();
-                if (stale) {
-                  task.retry();
-                } else {
-                  const busy = await agent.isBusy();
-                  if (busy) {
-                    const progressing = await agent.isProgessing();
-                    if (progressing) {
-                      continue
-                    } else {
-                      task.retry();
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      } else {
-        const unblockedTasks = await this.vikunja.listUnblockedReadyTasks();
-        if (unblockedTasks.length > 0) {
-          const prompt = this.taskPrompt(unblockedTasks[0]);
-          // will implement
-        }
-      }
     } catch (err) {
       log("tick failed:", messageOf(err))
     } finally {
@@ -119,8 +85,17 @@ export class Controller {
 
     return true
   }
-}
-function deleteCleanupQueue() {
-  throw new Error("Function not implemented.")
+
+  private async getFreeWorkers(): Promise<WorkerInterface[]> {
+    const workers = []
+    for (const worker of this.workers) {
+      const alive = await worker.isAlive();
+      const inProgress = await worker.isProgressing(worker.id);
+      if (alive && !inProgress) {
+        workers.push(worker)
+      }
+    }
+    return workers;
+  }
 }
 
