@@ -1,5 +1,8 @@
 // Exercises worker dispatch and reuse across scheduler ticks.
-import { describe, expect, it, vi } from "vitest"
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { TaskInterface } from "../src/interfaces/task.interface.js"
 import type { TaskManagerInterface } from "../src/interfaces/taskmanager.interface.js"
 import type { WorkerInterface } from "../src/interfaces/worker.interface.js"
@@ -30,6 +33,16 @@ const makeWorker = (id: string) => {
 }
 
 describe("TaskScheduler", () => {
+  let directory: string
+
+  beforeEach(async () => {
+    directory = await mkdtemp(join(tmpdir(), "task-scheduler-"))
+  })
+
+  afterEach(async () => {
+    await rm(directory, { recursive: true, force: true })
+  })
+
   it("waits for busy workers and returns all available workers to the pool", async () => {
     const tasks: TaskInterface[] = [1, 2, 3, 4].map((ticketId) => ({ ticketId, title: `Task ${ticketId}`, description: "" }))
     const getTasks = vi.fn(async () => tasks)
@@ -43,7 +56,7 @@ describe("TaskScheduler", () => {
     }
     const first = makeWorker("first")
     const second = makeWorker("second")
-    const scheduler = new TaskScheduler(taskManager, [first.worker, second.worker])
+    const scheduler = new TaskScheduler(taskManager, [first.worker, second.worker], join(directory, "sessions.json"))
 
     await scheduler.tick()
     await scheduler.tick()
@@ -60,5 +73,70 @@ describe("TaskScheduler", () => {
 
     expect(first.worker.create).toHaveBeenNthCalledWith(2, tasks[2])
     expect(second.worker.create).toHaveBeenNthCalledWith(2, tasks[3])
+  })
+
+  it("restores saved sessions and preserves them when another worker starts a task", async () => {
+    const sessionsFile = join(directory, "data", "sessions.json")
+    const taskManager: TaskManagerInterface = {
+      getTasks: async () => [{ ticketId: 1, title: "Task 1", description: "" }],
+      getReadyTasks: async () => [],
+      getInProgressTasks: async () => [],
+      getReviewTasks: async () => [],
+      getRetryTasks: async () => [],
+      getDoneTasks: async () => [],
+    }
+    const first = makeWorker("first")
+    const second = makeWorker("second")
+
+    await new TaskScheduler(taskManager, [first.worker], sessionsFile).tick()
+    expect(JSON.parse(await readFile(sessionsFile, "utf8"))).toEqual({ first: "session-first" })
+
+    await new TaskScheduler(taskManager, [second.worker], sessionsFile).tick()
+    expect(JSON.parse(await readFile(sessionsFile, "utf8"))).toEqual({
+      first: "session-first",
+      second: "session-second",
+    })
+  })
+
+  it("rejects a malformed sessions file instead of overwriting it", async () => {
+    const sessionsFile = join(directory, "sessions.json")
+    await writeFile(sessionsFile, '{"first":42}')
+    const taskManager: TaskManagerInterface = {
+      getTasks: async () => [],
+      getReadyTasks: async () => [],
+      getInProgressTasks: async () => [],
+      getReviewTasks: async () => [],
+      getRetryTasks: async () => [],
+      getDoneTasks: async () => [],
+    }
+
+    expect(() => new TaskScheduler(taskManager, [], sessionsFile)).toThrow("Invalid session for worker first")
+    expect(await readFile(sessionsFile, "utf8")).toBe('{"first":42}')
+  })
+
+  it("retries a failed save before dispatching more work", async () => {
+    const blocker = join(directory, "data")
+    const sessionsFile = join(blocker, "sessions.json")
+    const taskManager: TaskManagerInterface = {
+      getTasks: async () => [{ ticketId: 1, title: "Task 1", description: "" }],
+      getReadyTasks: async () => [],
+      getInProgressTasks: async () => [],
+      getReviewTasks: async () => [],
+      getRetryTasks: async () => [],
+      getDoneTasks: async () => [],
+    }
+    const first = makeWorker("first")
+    const second = makeWorker("second")
+    const scheduler = new TaskScheduler(taskManager, [first.worker, second.worker], sessionsFile)
+    await writeFile(blocker, "blocks directory creation")
+
+    await scheduler.tick()
+    await scheduler.tick()
+    expect(second.worker.create).not.toHaveBeenCalled()
+
+    await rm(blocker)
+    scheduler.paused = true
+    await scheduler.tick()
+    expect(JSON.parse(await readFile(sessionsFile, "utf8"))).toEqual({ first: "session-first" })
   })
 })

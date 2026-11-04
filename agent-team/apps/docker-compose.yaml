@@ -121,13 +121,17 @@ services:
       timeout: 5s
       start_period: 20s
 
-  # Feeds the frontend worker one ticket at a time from Vikunja. Stateless: the board is the state.
+  # Feeds the frontend worker one ticket at a time from Vikunja and saves worker session IDs.
   frontend-ctr:
     build: ./frontend-ctr
     container_name: opencode-frontend-ctr
     restart: unless-stopped
     env_file: ${ENV_FILE:-.env.local}
     working_dir: /app
+    environment:
+      CTR_SESSIONS_FILE: /data/sessions.json
+    volumes:
+      - frontend-ctr-data:/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
     # Node inspector on 9229 so VS Code can attach (frontend-ctr/.vscode/launch.json).
@@ -151,6 +155,7 @@ volumes:
   frontend-data:
   aws-architect-data:
   bridge-data:
+  frontend-ctr-data:
 
 networks:
   shared:

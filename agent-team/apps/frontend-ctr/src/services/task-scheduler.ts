@@ -1,5 +1,10 @@
 // Hands ready tasks to free workers. It knows nothing about where tasks come from or what the workers are:
 // it only sees TaskManagerInterface and WorkerInterface.
+import { randomUUID } from "node:crypto"
+import { readFileSync } from "node:fs"
+import { mkdir, rename, rm, writeFile } from "node:fs/promises"
+import { dirname } from "node:path"
+import { config } from "../config.js"
 import type { SnapshotInterface } from "../interfaces/snapshot.interface.js"
 import type { TaskManagerInterface } from "../interfaces/taskmanager.interface.js"
 import type { WorkerInterface } from "../interfaces/worker.interface.js"
@@ -23,8 +28,9 @@ export class TaskScheduler {
   // In-process mutex: stops two ticks from overlapping inside one process.
   private busy = false
 
-  // The session each worker is running, by worker id. Needed to ask a worker whether it is still busy.
+  // The latest session assigned to each worker, restored from disk after a restart.
   private readonly sessions = new Map<string, string>()
+  private sessionsDirty = false
 
   // Workers that have been given a task, checked on each tick until they are available again.
   private readonly busyWorkers: WorkerInterface[] = []
@@ -49,8 +55,53 @@ export class TaskScheduler {
   constructor(
     private readonly taskManager: TaskManagerInterface,
     workers: WorkerInterface[] = [],
+    private readonly sessionsFile: string = config.sessionsFile,
   ) {
     this.workers = [...workers]
+    this.loadSessions()
+  }
+
+  // An absent file means a fresh start; malformed or unreadable files must not be silently overwritten.
+  private loadSessions(): void {
+    let contents: string
+
+    try {
+      contents = readFileSync(this.sessionsFile, "utf8")
+    } catch (err) {
+      if (err instanceof Error && "code" in err && err.code === "ENOENT") {
+        return
+      }
+
+      throw err
+    }
+
+    const saved: unknown = JSON.parse(contents)
+
+    if (saved === null || typeof saved !== "object" || Array.isArray(saved)) {
+      throw new Error(`Invalid sessions file: ${this.sessionsFile}`)
+    }
+
+    for (const [workerId, sessionId] of Object.entries(saved)) {
+      if (typeof sessionId !== "string") {
+        throw new Error(`Invalid session for worker ${workerId} in ${this.sessionsFile}`)
+      }
+
+      this.sessions.set(workerId, sessionId)
+    }
+  }
+
+  // Write beside the destination and rename, so a stopped process cannot leave a half-written JSON file.
+  private async saveSessions(): Promise<void> {
+    await mkdir(dirname(this.sessionsFile), { recursive: true })
+    const temporaryFile = `${this.sessionsFile}.${randomUUID()}.tmp`
+
+    try {
+      await writeFile(temporaryFile, JSON.stringify(Object.fromEntries(this.sessions), null, 2) + "\n")
+      await rename(temporaryFile, this.sessionsFile)
+      this.sessionsDirty = false
+    } finally {
+      await rm(temporaryFile, { force: true })
+    }
   }
 
   // The current run, the ordered queue and the skipped tickets, for GET /status.
@@ -67,6 +118,11 @@ export class TaskScheduler {
     this.busy = true
 
     try {
+      // Retry a failed save before starting more work, even when the scheduler is paused.
+      if (this.sessionsDirty) {
+        await this.saveSessions()
+      }
+
       if (!this.paused) {
         await this.dispatchNext()
       }
@@ -102,6 +158,8 @@ export class TaskScheduler {
     this.busyWorkers.push(worker)
     this.dispatched.add(task.ticketId)
     this.sessions.set(worker.id, sessionId)
+    this.sessionsDirty = true
+    await this.saveSessions()
 
     log(`task ${task.ticketId} -> worker ${worker.id}`)
   }

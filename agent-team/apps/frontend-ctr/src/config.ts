@@ -45,6 +45,7 @@ const _maxRunMin = readNumber(process.env.CTR_MAX_RUN_MIN, 60)
 const _graceMin = readNumber(process.env.CTR_GRACE_MIN, 5)
 const _maxFailures = readNumber(process.env.CTR_MAX_FAILURES, 3)
 const _dryRun = process.env.CTR_DRY_RUN === "true"
+const _sessionsFile = process.env.CTR_SESSIONS_FILE ?? "data/sessions.json"
 
 // GitHub (optional): lets the controller look for a pull request on the branch after a hard deadline
 const _githubRepo = process.env.CTR_GITHUB_REPO ?? ""
@@ -83,6 +84,7 @@ export const config = {
   graceMin: _graceMin,
   maxFailures: _maxFailures,
   dryRun: _dryRun,
+  sessionsFile: _sessionsFile,
 
   githubRepo: _githubRepo,
   githubToken: _githubToken,
