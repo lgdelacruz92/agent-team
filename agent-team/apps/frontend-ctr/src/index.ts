@@ -7,10 +7,11 @@ import { VikunjaService } from "./services/vikunja.service.js"
 import type { WorkerInterface } from "./interfaces/worker.interface.js"
 import { OpencodeWorker } from "./components/opencode-worker.js"
 import { TaskManager } from "./components/task-manager.js"
+import { VikunjaAPI } from "./api/vikunja.api.js"
 
 // The task manager and the workers are built here and handed to the scheduler.
 // The task manager reads tickets from Vikunja; the scheduler only sees TaskManagerInterface and does not care where they come from.
-const taskManager = new TaskManager(new VikunjaService())
+const taskManager = new TaskManager(new VikunjaService(new VikunjaAPI()))
 
 // One worker for now: the frontend worker, at the configured opencode URL.
 const agent = new OpencodeAgent(config.opencodeUser, [], config.opencodeUrl);

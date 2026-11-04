@@ -1,5 +1,6 @@
 // Checks requests for Vikunja ticket moves and labels.
 import { afterEach, describe, expect, it, vi } from "vitest"
+import { VikunjaAPI } from "../src/api/vikunja.api.js"
 import { VikunjaService } from "../src/services/vikunja.service.js"
 
 afterEach(() => {
@@ -13,7 +14,7 @@ describe("VikunjaService.moveToColumn", () => {
       .mockResolvedValueOnce({ ok: true })
 
     vi.stubGlobal("fetch", fetchMock)
-    const service = new VikunjaService("http://vikunja.test", "token", 1000, 2, 3, 200)
+    const service = new VikunjaService(new VikunjaAPI("http://vikunja.test", "token", 1000), "http://vikunja.test", "token", 1000, 2, 3, 200)
 
     await service.moveToColumn(42, "In progress")
 
@@ -30,7 +31,7 @@ describe("VikunjaService.moveToColumn", () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] })
 
     vi.stubGlobal("fetch", fetchMock)
-    const service = new VikunjaService("http://vikunja.test", "token", 1000, 2, 3, 200)
+    const service = new VikunjaService(new VikunjaAPI("http://vikunja.test", "token", 1000), "http://vikunja.test", "token", 1000, 2, 3, 200)
 
     await expect(service.moveToColumn(42, "Review")).rejects.toThrow('Vikunja column "Review" does not exist')
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -42,7 +43,7 @@ describe("VikunjaService.moveToColumn", () => {
       .mockResolvedValueOnce({ ok: false, status: 403, text: async () => "Forbidden" })
 
     vi.stubGlobal("fetch", fetchMock)
-    const service = new VikunjaService("http://vikunja.test", "token", 1000, 2, 3, 200)
+    const service = new VikunjaService(new VikunjaAPI("http://vikunja.test", "token", 1000), "http://vikunja.test", "token", 1000, 2, 3, 200)
 
     await expect(service.moveToColumn(42, "Review")).rejects.toThrow("returned 403: Forbidden")
   })
@@ -54,7 +55,7 @@ describe("VikunjaService labels", () => {
       .mockResolvedValueOnce({ ok: true })
       .mockResolvedValueOnce({ ok: false, status: 403, text: async () => "Forbidden" })
     vi.stubGlobal("fetch", fetchMock)
-    const service = new VikunjaService("http://vikunja.test", "token", 1000, 2, 3, 200)
+    const service = new VikunjaService(new VikunjaAPI("http://vikunja.test", "token", 1000), "http://vikunja.test", "token", 1000, 2, 3, 200)
 
     await service.addLabel(42, 7)
     expect(fetchMock).toHaveBeenCalledWith("http://vikunja.test/api/v1/tasks/42/labels", expect.objectContaining({
@@ -63,5 +64,20 @@ describe("VikunjaService labels", () => {
       body: JSON.stringify({ label_id: 7 }),
     }))
     await expect(service.addLabel(42, 7)).rejects.toThrow("returned 403: Forbidden")
+  })
+})
+
+describe("VikunjaAPI.put", () => {
+  it("sends the caller's JSON body", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+    vi.stubGlobal("fetch", fetchMock)
+    const api = new VikunjaAPI("http://vikunja.test", "token", 1000)
+
+    await api.put("/tasks/42", { title: "Updated task" })
+
+    expect(fetchMock).toHaveBeenCalledWith("http://vikunja.test/api/v1/tasks/42", expect.objectContaining({
+      method: "PUT",
+      body: JSON.stringify({ title: "Updated task" }),
+    }))
   })
 })

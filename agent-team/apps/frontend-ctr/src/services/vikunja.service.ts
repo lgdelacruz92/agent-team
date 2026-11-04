@@ -2,6 +2,7 @@
 // It implements VikunjaServiceInterface, which is the only surface the rest of the controller needs.
 
 import { config } from "../config.js"
+import type { VikunjaAPIInterface } from "../interfaces/vikunja.api.interface.js"
 import type { VikunjaServiceInterface } from "../interfaces/vikunja.service.interface.js"
 import { vikunjaColumns } from "../interfaces/vikunja.types.js"
 import type { VikunjaBucketInterface, VikunjaColumn, VikunjaTaskInterface } from "../interfaces/vikunja.types.js"
@@ -9,6 +10,7 @@ import type { VikunjaBucketInterface, VikunjaColumn, VikunjaTaskInterface } from
 // Reads and moves tickets on the bound project's kanban board.
 export class VikunjaService implements VikunjaServiceInterface {
   constructor(
+    private readonly vikunjaAPI: VikunjaAPIInterface,
     private readonly baseUrl: string = config.vikunjaUrl,
     private readonly token: string = config.vikunjaToken,
     private readonly timeoutMs: number = config.vikunjaTimeoutMs,
@@ -73,12 +75,7 @@ export class VikunjaService implements VikunjaServiceInterface {
   // Attach one existing label, leaving all other ticket labels intact.
   async addLabel(ticketId: number, labelId: number): Promise<void> {
     const path = `/tasks/${ticketId}/labels`
-    const res = await fetch(`${this.baseUrl}/api/v1${path}`, {
-      method: "PUT",
-      headers: { Authorization: `Bearer ${this.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ label_id: labelId }),
-      signal: AbortSignal.timeout(this.timeoutMs),
-    })
+    const res = await this.vikunjaAPI.put(path, { label_id: labelId })
 
     if (!res.ok) {
       throw new Error(`Vikunja PUT ${path} returned ${res.status}: ${await res.text()}`)
