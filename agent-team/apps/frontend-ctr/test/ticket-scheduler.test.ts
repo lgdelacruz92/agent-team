@@ -9,6 +9,11 @@ import type { TicketManagerInterface } from "../src/interfaces/ticketmanager.int
 import type { WorkerInterface } from "../src/interfaces/worker.interface.js"
 import { TicketScheduler } from "../src/services/ticket-scheduler.js"
 
+// Scheduler tests do not convert their fake tickets back to source tasks.
+const toTask = () => {
+  throw new Error("not used")
+}
+
 // A worker stays busy after accepting a ticket until the test marks it available again.
 const makeWorker = (id: string) => {
   let available = true
@@ -45,7 +50,7 @@ describe("TicketScheduler", () => {
   })
 
   it("waits for busy workers and returns all available workers to the pool", async () => {
-    const tickets: TicketInterface[] = [1, 2, 3, 4].map((ticketId) => ({ ticketId, title: `Ticket ${ticketId}`, description: "" }))
+    const tickets: TicketInterface[] = [1, 2, 3, 4].map((ticketId) => ({ ticketId, title: `Ticket ${ticketId}`, description: "", getLabels: async () => [], toTask }))
     const getTickets = vi.fn(async () => tickets)
     const ticketManager: TicketManagerInterface = {
       getTickets,
@@ -80,7 +85,7 @@ describe("TicketScheduler", () => {
 
   it("restores saved sessions and preserves them when another worker starts a ticket", async () => {
     const sessionsFile = join(directory, "data", "sessions.json")
-    const tickets: TicketInterface[] = [1, 2].map((ticketId) => ({ ticketId, title: `Ticket ${ticketId}`, description: "" }))
+    const tickets: TicketInterface[] = [1, 2].map((ticketId) => ({ ticketId, title: `Ticket ${ticketId}`, description: "", getLabels: async () => [], toTask }))
     const ticketManager: TicketManagerInterface = {
       getTickets: async () => [...tickets],
       getReadyTickets: async () => [],
@@ -131,7 +136,7 @@ describe("TicketScheduler", () => {
     const blocker = join(directory, "data")
     const sessionsFile = join(blocker, "sessions.json")
     const ticketManager: TicketManagerInterface = {
-      getTickets: async () => [{ ticketId: 1, title: "Ticket 1", description: "" }],
+      getTickets: async () => [{ ticketId: 1, title: "Ticket 1", description: "", getLabels: async () => [], toTask }],
       getReadyTickets: async () => [],
       getInProgressTickets: async () => [],
       getReviewTickets: async () => [],
@@ -156,7 +161,7 @@ describe("TicketScheduler", () => {
   })
 
   it("retries a failed move without creating the ticket again", async () => {
-    const ticket: TicketInterface = { ticketId: 1, title: "Ticket 1", description: "" }
+    const ticket: TicketInterface = { ticketId: 1, title: "Ticket 1", description: "", getLabels: async () => [], toTask }
     const moveTo = vi.fn<TicketManagerInterface["moveTo"]>()
       .mockRejectedValueOnce(new Error("board unavailable"))
       .mockRejectedValueOnce(new Error("board unavailable"))
@@ -190,7 +195,7 @@ describe("TicketScheduler", () => {
   it("does not move a ticket when starting its worker fails", async () => {
     const moveTo = vi.fn<TicketManagerInterface["moveTo"]>()
     const ticketManager: TicketManagerInterface = {
-      getTickets: async () => [{ ticketId: 1, title: "Ticket 1", description: "" }],
+      getTickets: async () => [{ ticketId: 1, title: "Ticket 1", description: "", getLabels: async () => [], toTask }],
       getReadyTickets: async () => [],
       getInProgressTickets: async () => [],
       getReviewTickets: async () => [],

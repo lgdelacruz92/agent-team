@@ -1,20 +1,12 @@
 // Turns Vikunja tasks into TicketInterface objects the scheduler understands.
 // It is the bridge between the Vikunja service and the scheduler, so neither needs to know about the other.
 
-import type { TicketInterface } from "../interfaces/ticket.interface.js"
-import type { TicketColumn, TicketLabelInterface, TicketManagerInterface } from "../interfaces/ticketmanager.interface.js"
+import type { TicketInterface, TicketLabelInterface } from "../interfaces/ticket.interface.js"
+import type { TicketColumn, TicketManagerInterface } from "../interfaces/ticketmanager.interface.js"
 import type { VikunjaServiceInterface } from "../interfaces/vikunja.service.interface.js"
 import { vikunjaColumns } from "../interfaces/vikunja.types.js"
-import type { VikunjaColumn, VikunjaTaskInterface } from "../interfaces/vikunja.types.js"
-
-// Converts a Vikunja task into the ticket shape the scheduler and workers use.
-const toTicket = (task: VikunjaTaskInterface): TicketInterface => {
-  return {
-    ticketId: task.id,
-    title: task.title,
-    description: task.description,
-  }
-}
+import type { VikunjaColumn } from "../interfaces/vikunja.types.js"
+import { Ticket } from "./ticket.js"
 
 // Reads Vikunja tasks through the service and presents them as tickets.
 export class TicketManager implements TicketManagerInterface {
@@ -26,7 +18,7 @@ export class TicketManager implements TicketManagerInterface {
     const ready = await this.vikunja.getReadyUnblockedTasks()
     const retry = await this.vikunja.getTasks(vikunjaColumns.retry)
 
-    return [...ready, ...retry].map(toTicket)
+    return [...ready, ...retry].map((task) => Ticket.fromTask(task, this.vikunja))
   }
 
   // Tickets waiting to be started.
@@ -54,13 +46,9 @@ export class TicketManager implements TicketManagerInterface {
     return this.ticketsIn(vikunjaColumns.done)
   }
 
-  // Look up a ticket's labels by its Vikunja task ID.
-  async getLabels(ticketId: TicketInterface["ticketId"]): Promise<TicketLabelInterface[]> {
-    if (typeof ticketId !== "number") {
-      throw new Error(`Vikunja task ID must be a number: ${ticketId}`)
-    }
-
-    return this.vikunja.getLabels(ticketId)
+  // Delegate label lookup to the ticket, which knows its source.
+  getLabels(ticket: TicketInterface): Promise<TicketLabelInterface[]> {
+    return ticket.getLabels()
   }
 
   // Vikunja identifies tasks by number, even though other task sources may use string IDs.
@@ -76,6 +64,6 @@ export class TicketManager implements TicketManagerInterface {
   private async ticketsIn(column: VikunjaColumn): Promise<TicketInterface[]> {
     const tasks = await this.vikunja.getTasks(column)
 
-    return tasks.map(toTicket)
+    return tasks.map((task) => Ticket.fromTask(task, this.vikunja))
   }
 }

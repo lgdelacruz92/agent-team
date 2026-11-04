@@ -1,3 +1,4 @@
+// Exercises the opencode worker using an in-memory agent.
 import { describe, expect, it, vi } from "vitest"
 import { OpencodeWorker } from "../src/components/opencode-worker.js"
 import type {
@@ -101,7 +102,7 @@ describe("OpencodeWorker", () => {
     const prompt = vi.spyOn(agent, "prompt")
     const worker = new OpencodeWorker("frontend-1", ["react"], agent)
 
-    await worker.create({ ticketId: 42, title: "Add feature", description: "Details" })
+    await worker.create({ ticketId: 42, title: "Add feature", description: "Details", getLabels: async () => [], toTask: () => { throw new Error("not used") } })
 
     expect(createSession).toHaveBeenCalledWith("#42 Add feature")
     expect(prompt).toHaveBeenCalledWith("ses_1", "Ticket #42: Add feature\n\nDetails\n\nBranch: ticket-42-add-feature")

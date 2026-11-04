@@ -2,7 +2,7 @@
 // (Vikunja or anything else) can change without touching them.
 // There is one method per kanban column in ticketColumns; add a method here when a column is added there.
 
-import type { TicketInterface } from "./ticket.interface.js"
+import type { TicketInterface, TicketLabelInterface } from "./ticket.interface.js"
 
 // Column titles used by the scheduler, independent of the ticket source.
 export const ticketColumns = {
@@ -15,12 +15,6 @@ export const ticketColumns = {
 
 // A destination column accepted by the ticket manager.
 export type TicketColumn = (typeof ticketColumns)[keyof typeof ticketColumns]
-
-// A label attached to a ticket, independent of the ticket source.
-export interface TicketLabelInterface {
-  readonly id: string | number
-  readonly title: string
-}
 
 // Supplies and moves tickets without exposing the underlying source.
 export interface TicketManagerInterface {
@@ -42,8 +36,8 @@ export interface TicketManagerInterface {
   // Tickets that are complete.
   getDoneTickets(): Promise<TicketInterface[]>
 
-  // Labels attached to the ticket identified by ticketId.
-  getLabels(ticketId: TicketInterface["ticketId"]): Promise<TicketLabelInterface[]>
+  // Fetches the current labels attached to the ticket.
+  getLabels(ticket: TicketInterface): Promise<TicketLabelInterface[]>
 
   // Moves a ticket to a destination column; rejects if the ticket or column cannot be moved.
   moveTo(ticketId: TicketInterface["ticketId"], column: TicketColumn): Promise<void>

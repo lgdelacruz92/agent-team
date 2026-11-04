@@ -10,6 +10,8 @@ const ticket: TicketInterface = {
   ticketId: 1,
   title: "Contract test ticket",
   description: "Does nothing. Used to open a session.",
+  getLabels: async () => [],
+  toTask: () => { throw new Error("not used") },
 }
 
 // Runs the WorkerInterface contract against the worker that `makeWorker` returns.

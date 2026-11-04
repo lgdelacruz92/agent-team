@@ -19,8 +19,8 @@ describe("TicketManager.getTickets", () => {
     const manager = new TicketManager(vikunja)
 
     await expect(manager.getTickets()).resolves.toEqual([
-      { ticketId: 1, title: "Ready", description: "First" },
-      { ticketId: 2, title: "Retry", description: "Second" },
+      expect.objectContaining({ ticketId: 1, title: "Ready", description: "First" }),
+      expect.objectContaining({ ticketId: 2, title: "Retry", description: "Second" }),
     ])
     expect(getTasks).toHaveBeenCalledWith(ticketColumns.retry)
   })
@@ -55,17 +55,34 @@ describe("TicketManager.getLabels", () => {
       .mockRejectedValueOnce(new Error("Vikunja unavailable"))
     const vikunja: VikunjaServiceInterface = {
       getTasks: async () => [],
-      getReadyUnblockedTasks: async () => [],
+      getReadyUnblockedTasks: async () => [{ id: 42, title: "Ticket", description: "", done: false, due_date: "", labels: null }],
       moveToColumn: async () => {},
       getLabels,
       addLabel: async () => {},
     }
     const manager = new TicketManager(vikunja)
 
-    await expect(manager.getLabels(42)).resolves.toEqual([{ id: 7, title: "frontend" }])
+    const [ticket] = await manager.getTickets()
+
+    expect(getLabels).not.toHaveBeenCalled()
+    await expect(ticket.getLabels()).resolves.toEqual([{ id: 7, title: "frontend" }])
     expect(getLabels).toHaveBeenCalledWith(42)
-    await expect(manager.getLabels(42)).rejects.toThrow("Vikunja unavailable")
-    await expect(manager.getLabels("external-id")).rejects.toThrow("Vikunja task ID must be a number")
+    await expect(manager.getLabels(ticket)).rejects.toThrow("Vikunja unavailable")
     expect(getLabels).toHaveBeenCalledTimes(2)
+  })
+
+  it("delegates to the supplied ticket regardless of its source", async () => {
+    const vikunja: VikunjaServiceInterface = {
+      getTasks: async () => [],
+      getReadyUnblockedTasks: async () => [],
+      moveToColumn: async () => {},
+      getLabels: async () => [],
+      addLabel: async () => {},
+    }
+    const getLabels = vi.fn().mockResolvedValue([{ id: "label", title: "frontend" }])
+    const ticket = { ticketId: "external-id", title: "Ticket", description: "", getLabels, toTask: () => { throw new Error("not used") } }
+
+    await expect(new TicketManager(vikunja).getLabels(ticket)).resolves.toEqual([{ id: "label", title: "frontend" }])
+    expect(getLabels).toHaveBeenCalledOnce()
   })
 })
