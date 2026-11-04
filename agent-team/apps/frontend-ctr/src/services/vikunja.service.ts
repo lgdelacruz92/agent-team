@@ -5,7 +5,7 @@ import { config } from "../config.js"
 import type { VikunjaAPIInterface } from "../interfaces/vikunja.api.interface.js"
 import type { VikunjaServiceInterface } from "../interfaces/vikunja.service.interface.js"
 import { vikunjaColumns } from "../interfaces/vikunja.types.js"
-import type { VikunjaBucketInterface, VikunjaColumn, VikunjaTaskInterface } from "../interfaces/vikunja.types.js"
+import type { VikunjaBucketInterface, VikunjaColumn, VikunjaLabelInterface, VikunjaTaskInterface } from "../interfaces/vikunja.types.js"
 
 // Reads and moves tickets on the bound project's kanban board.
 export class VikunjaService implements VikunjaServiceInterface {
@@ -62,6 +62,29 @@ export class VikunjaService implements VikunjaServiceInterface {
     if (!res.ok) {
       throw new Error(`Vikunja POST ${path} returned ${res.status}: ${await res.text()}`)
     }
+  }
+
+  // Read every page of labels attached to the ticket through the API client.
+  async getLabels(ticketId: number): Promise<VikunjaLabelInterface[]> {
+    const labels: VikunjaLabelInterface[] = []
+    let page = 1
+    let totalPages = 1
+
+    while (page <= totalPages) {
+      const path = `/tasks/${ticketId}/labels?page=${page}`
+      const res = await this.vikunjaAPI.get(path)
+
+      if (!res.ok) {
+        throw new Error(`Vikunja GET ${path} returned ${res.status}: ${await res.text()}`)
+      }
+
+      const result = (await res.json()) as VikunjaLabelInterface[] | null
+      labels.push(...(result ?? []))
+      totalPages = Number(res.headers.get("x-pagination-total-pages") ?? "1")
+      page += 1
+    }
+
+    return labels
   }
 
   // Attach one existing label, leaving all other ticket labels intact.

@@ -11,6 +11,7 @@ describe("TaskManager.moveTo", () => {
       getTickets: async () => [],
       getReadyUnblockedTickets: async () => [],
       moveToColumn,
+      getLabels: async () => [],
       addLabel: async () => {},
     }
     const manager = new TaskManager(vikunja)

@@ -82,6 +82,36 @@ describe("VikunjaService.moveToColumn", () => {
 })
 
 describe("VikunjaService labels", () => {
+  it("returns labels from every page for a ticket", async () => {
+    const get = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ id: 1, title: "frontend" }]), {
+        headers: { "x-pagination-total-pages": "2" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ id: 2, title: "urgent" }]), {
+        headers: { "x-pagination-total-pages": "2" },
+      }))
+    const api: VikunjaAPIInterface = { get, post: vi.fn(), put: vi.fn() }
+    const service = new VikunjaService(api, 2, 3, 200)
+
+    await expect(service.getLabels(42)).resolves.toEqual([
+      { id: 1, title: "frontend" },
+      { id: 2, title: "urgent" },
+    ])
+    expect(get).toHaveBeenNthCalledWith(1, "/tasks/42/labels?page=1")
+    expect(get).toHaveBeenNthCalledWith(2, "/tasks/42/labels?page=2")
+  })
+
+  it("returns no labels for an empty response and reports API failures", async () => {
+    const get = vi.fn()
+      .mockResolvedValueOnce(new Response("null", { headers: { "x-pagination-total-pages": "0" } }))
+      .mockResolvedValueOnce(new Response("Forbidden", { status: 403 }))
+    const api: VikunjaAPIInterface = { get, post: vi.fn(), put: vi.fn() }
+    const service = new VikunjaService(api, 2, 3, 200)
+
+    await expect(service.getLabels(42)).resolves.toEqual([])
+    await expect(service.getLabels(42)).rejects.toThrow("returned 403: Forbidden")
+  })
+
   it("adds one label to a ticket and reports failures", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({ ok: true })
