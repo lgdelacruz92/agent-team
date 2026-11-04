@@ -1,13 +1,13 @@
-// Hands ready tasks to free workers. It knows nothing about where tasks come from or what the workers are:
-// it only sees TaskManagerInterface and WorkerInterface.
+// Hands ready tickets to free workers. It knows nothing about where tickets come from or what the workers are:
+// it only sees TicketManagerInterface and WorkerInterface.
 import { randomUUID } from "node:crypto"
 import { readFileSync } from "node:fs"
 import { mkdir, rename, rm, writeFile } from "node:fs/promises"
 import { dirname } from "node:path"
 import { config } from "../config.js"
 import type { SnapshotInterface } from "../interfaces/snapshot.interface.js"
-import { taskColumns } from "../interfaces/taskmanager.interface.js"
-import type { TaskManagerInterface } from "../interfaces/taskmanager.interface.js"
+import { ticketColumns } from "../interfaces/ticketmanager.interface.js"
+import type { TicketManagerInterface } from "../interfaces/ticketmanager.interface.js"
 import type { WorkerInterface } from "../interfaces/worker.interface.js"
 
 // Logs a line prefixed with the current time.
@@ -22,8 +22,8 @@ const messageOf = (err: unknown): string => {
   return String(err)
 }
 
-// Each tick takes the next ready task and gives it to the first free worker.
-export class TaskScheduler {
+// Each tick takes the next ready ticket and gives it to the first free worker.
+export class TicketScheduler {
   paused = false
 
   // In-process mutex: stops two ticks from overlapping inside one process.
@@ -33,7 +33,7 @@ export class TaskScheduler {
   private readonly sessions = new Map<string, string>()
   private sessionsDirty = false
 
-  // Workers that have been given a task, checked on each tick until they are available again.
+  // Workers that have been given a ticket, checked on each tick until they are available again.
   private readonly busyWorkers: WorkerInterface[] = []
   private readonly workers: WorkerInterface[]
 
@@ -47,13 +47,13 @@ export class TaskScheduler {
     skipped: [],
   }
 
-  // Avoid handing the same task to another worker while its board move is pending or the task list is stale.
+  // Avoid handing the same ticket to another worker while its board move is pending or the ticket list is stale.
   private readonly dispatched = new Set<string | number>()
   private readonly pendingMoves = new Set<string | number>()
 
-  // The scheduler asks the task manager for ready tasks whenever a worker is free, so it holds no queue of its own.
+  // The scheduler asks the ticket manager for ready tickets whenever a worker is free, so it holds no queue of its own.
   constructor(
-    private readonly taskManager: TaskManagerInterface,
+    private readonly ticketManager: TicketManagerInterface,
     workers: WorkerInterface[] = [],
     private readonly sessionsFile: string = config.sessionsFile,
   ) {
@@ -124,7 +124,7 @@ export class TaskScheduler {
       }
 
       // Finish a failed board update before handing out more work, even when paused.
-      await this.movePendingTasks()
+      await this.movePendingTickets()
 
       if (!this.paused) {
         await this.dispatchNext()
@@ -138,41 +138,41 @@ export class TaskScheduler {
     return true
   }
 
-  // Gives the next ready task to the first free worker. Does nothing when there is no task or no free worker.
+  // Gives the next ready ticket to the first free worker. Does nothing when there is no ticket or no free worker.
   private async dispatchNext(): Promise<void> {
-    // Look for a worker first, so the task source is not queried when nobody could take the task.
+    // Look for a worker first, so the ticket source is not queried when nobody could take the ticket.
     const worker = await this.findFreeWorker()
 
     if (!worker) {
       return
     }
 
-    const readyTasks = await this.taskManager.getTasks()
-    const task = readyTasks.find((candidate) => !this.dispatched.has(candidate.ticketId))
+    const readyTickets = await this.ticketManager.getTickets()
+    const ticket = readyTickets.find((candidate) => !this.dispatched.has(candidate.ticketId))
 
-    if (!task) {
+    if (!ticket) {
       return
     }
 
-    // Remember the task only after create() succeeds, so a failed start leaves it eligible for the next tick.
-    const sessionId = await worker.create(task)
+    // Remember the ticket only after create() succeeds, so a failed start leaves it eligible for the next tick.
+    const sessionId = await worker.create(ticket)
 
     this.workers.splice(this.workers.indexOf(worker), 1)
     this.busyWorkers.push(worker)
-    this.dispatched.add(task.ticketId)
-    this.pendingMoves.add(task.ticketId)
+    this.dispatched.add(ticket.ticketId)
+    this.pendingMoves.add(ticket.ticketId)
     this.sessions.set(worker.id, sessionId)
     this.sessionsDirty = true
     await this.saveSessions()
-    await this.movePendingTasks()
+    await this.movePendingTickets()
 
-    log(`task ${task.ticketId} -> worker ${worker.id}`)
+    log(`ticket ${ticket.ticketId} -> worker ${worker.id}`)
   }
 
-  // Keep a failed move pending so a later tick can retry without starting the task again.
-  private async movePendingTasks(): Promise<void> {
+  // Keep a failed move pending so a later tick can retry without starting the ticket again.
+  private async movePendingTickets(): Promise<void> {
     for (const ticketId of this.pendingMoves) {
-      await this.taskManager.moveTo(ticketId, taskColumns.inProgress)
+      await this.ticketManager.moveTo(ticketId, ticketColumns.inProgress)
       this.pendingMoves.delete(ticketId)
     }
   }

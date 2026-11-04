@@ -2,11 +2,11 @@
 // rely on the behaviour below without knowing which worker it holds. It is not a *.test.ts file on purpose:
 // vitest only runs it when an implementation's own test file calls workerContract().
 import { describe, expect, it } from "vitest"
-import type { TaskInterface } from "../src/interfaces/task.interface.js"
+import type { TicketInterface } from "../src/interfaces/ticket.interface.js"
 import type { WorkerInterface } from "../src/interfaces/worker.interface.js"
 
 // A minimal ticket to start a run with. Only the fields the prompt is built from matter.
-const task: TaskInterface = {
+const ticket: TicketInterface = {
   ticketId: 1,
   title: "Contract test ticket",
   description: "Does nothing. Used to open a session.",
@@ -44,7 +44,7 @@ export const workerContract = (name: string, makeWorker: () => WorkerInterface |
 
       it("is not available while a ticket is running, and is again after abort", async () => {
         const worker = await makeWorker()
-        const sessionId = await worker.create(task)
+        const sessionId = await worker.create(ticket)
 
         expect(await worker.isAvailable()).toBe(false)
 
@@ -59,7 +59,7 @@ export const workerContract = (name: string, makeWorker: () => WorkerInterface |
     describe("create", () => {
       it("returns a non-empty session id", async () => {
         const worker = await makeWorker()
-        const sessionId = await worker.create(task)
+        const sessionId = await worker.create(ticket)
 
         expect(sessionId).toEqual(expect.any(String))
         expect(sessionId.length).toBeGreaterThan(0)
@@ -69,8 +69,8 @@ export const workerContract = (name: string, makeWorker: () => WorkerInterface |
 
       it("returns a different session id for each call", async () => {
         const worker = await makeWorker()
-        const first = await worker.create(task)
-        const second = await worker.create(task)
+        const first = await worker.create(ticket)
+        const second = await worker.create(ticket)
 
         expect(first).not.toBe(second)
 
@@ -82,7 +82,7 @@ export const workerContract = (name: string, makeWorker: () => WorkerInterface |
     describe("abort", () => {
       it("stops the turn and leaves the session usable for the checks", async () => {
         const worker = await makeWorker()
-        const sessionId = await worker.create(task)
+        const sessionId = await worker.create(ticket)
 
         await expect(worker.abort(sessionId)).resolves.toBeUndefined()
         await expect(worker.isAvailable()).resolves.toBe(true)
@@ -94,14 +94,14 @@ export const workerContract = (name: string, makeWorker: () => WorkerInterface |
     describe("delete", () => {
       it("deletes a session", async () => {
         const worker = await makeWorker()
-        const sessionId = await worker.create(task)
+        const sessionId = await worker.create(ticket)
 
         await expect(worker.delete(sessionId)).resolves.toBeUndefined()
       })
 
       it("treats a session that is already gone as deleted, so the cleanup queue can retry safely", async () => {
         const worker = await makeWorker()
-        const sessionId = await worker.create(task)
+        const sessionId = await worker.create(ticket)
 
         await worker.delete(sessionId)
 

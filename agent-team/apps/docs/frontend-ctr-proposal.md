@@ -168,7 +168,7 @@ interface Worker {
   id: string
   skills: string[]
   status(sessionId: string): Promise<WorkerStatus>
-  dispatch(task: Task, prompt: string): Promise<string> // returns the session id
+  dispatch(ticket: Ticket, prompt: string): Promise<string> // returns the session id
   wrapUp(sessionId: string): Promise<void>
   abort(sessionId: string): Promise<void>
 }

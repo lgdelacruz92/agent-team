@@ -2,10 +2,10 @@
 // and starts and stops sessions on the agent. Session checks (done, stale, busy, progressing) live on the agent.
 import { config } from "../config.js"
 import type { OpencodeAgentInterface } from "../interfaces/opencode-agent.interface.js"
-import type { TaskInterface } from "../interfaces/task.interface.js"
+import type { TicketInterface } from "../interfaces/ticket.interface.js"
 import type { WorkerInterface } from "../interfaces/worker.interface.js"
 import { OpencodeAgent } from "../services/opencode-agent.js"
-import { taskPrompt } from "./task-prompt.js"
+import { ticketPrompt } from "./ticket-prompt.js"
 
 // A worker the Controller can hand tickets to, identified by its id.
 export class OpencodeWorker implements WorkerInterface {
@@ -28,12 +28,12 @@ export class OpencodeWorker implements WorkerInterface {
   }
 
   // Opens a session, sends the ticket prompt and returns the session id to store on the ticket.
-  async create(task: TaskInterface): Promise<string> {
-    const session = await this.agent.createSession(`#${task.ticketId} ${task.title}`)
+  async create(ticket: TicketInterface): Promise<string> {
+    const session = await this.agent.createSession(`#${ticket.ticketId} ${ticket.title}`)
 
     this.sessionIds.add(session.id)
 
-    await this.agent.prompt(session.id, taskPrompt(task))
+    await this.agent.prompt(session.id, ticketPrompt(ticket))
 
     return session.id
   }

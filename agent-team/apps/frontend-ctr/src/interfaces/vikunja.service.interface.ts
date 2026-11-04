@@ -3,21 +3,21 @@
 
 import type { VikunjaColumn, VikunjaLabelInterface, VikunjaTaskInterface } from "./vikunja.types.js"
 
-// Reads and moves tickets on the bound project's kanban board.
+// Reads and moves Vikunja tasks on the bound project's kanban board.
 export interface VikunjaServiceInterface {
-  // Returns the tickets in the kanban column whose title matches `column` (case-insensitive).
+  // Returns the tasks in the kanban column whose title matches `column` (case-insensitive).
   // Resolves to an empty array when the column is empty or does not exist.
-  getTickets(column: VikunjaColumn): Promise<VikunjaTaskInterface[]>
+  getTasks(column: VikunjaColumn): Promise<VikunjaTaskInterface[]>
 
-  // Returns the tickets in the Ready column that no other ticket blocks, so none of them is waiting on unfinished work.
-  getReadyUnblockedTickets(): Promise<VikunjaTaskInterface[]>
+  // Returns the tasks in the Ready column that no other task blocks.
+  getReadyUnblockedTasks(): Promise<VikunjaTaskInterface[]>
 
-  // Moves a ticket to the column with this title (case-insensitive). Throws if the column does not exist.
-  moveToColumn(ticketId: number, column: VikunjaColumn): Promise<void>
+  // Moves a task to the column with this title (case-insensitive). Throws if the column does not exist.
+  moveToColumn(taskId: number, column: VikunjaColumn): Promise<void>
 
-  // Returns all labels attached to the ticket, or an empty array when it has none.
-  getLabels(ticketId: number): Promise<VikunjaLabelInterface[]>
+  // Returns all labels attached to the task, or an empty array when it has none.
+  getLabels(taskId: number): Promise<VikunjaLabelInterface[]>
 
-  // Adds an existing label to a ticket without changing its other labels.
-  addLabel(ticketId: number, labelId: number): Promise<void>
+  // Adds an existing label to a task without changing its other labels.
+  addLabel(taskId: number, labelId: number): Promise<void>
 }

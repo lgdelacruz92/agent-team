@@ -60,7 +60,7 @@ describe("VikunjaService.moveToColumn", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 503, text: async () => "Unavailable" }))
     const service = new VikunjaService(new VikunjaAPI("http://vikunja.test", "token", 1000), 2, 3, 200)
 
-    await expect(service.getTickets("Ready")).rejects.toThrow("returned 503: Unavailable")
+    await expect(service.getTasks("Ready")).rejects.toThrow("returned 503: Unavailable")
   })
 
   it("uses the injected API for bucket reads and moves", async () => {

@@ -7,7 +7,7 @@ import type { VikunjaServiceInterface } from "../interfaces/vikunja.service.inte
 import { vikunjaColumns } from "../interfaces/vikunja.types.js"
 import type { VikunjaBucketInterface, VikunjaColumn, VikunjaLabelInterface, VikunjaTaskInterface } from "../interfaces/vikunja.types.js"
 
-// Reads and moves tickets on the bound project's kanban board.
+// Reads and moves tasks on the bound project's kanban board.
 export class VikunjaService implements VikunjaServiceInterface {
   constructor(
     private readonly vikunjaAPI: VikunjaAPIInterface,
@@ -16,34 +16,34 @@ export class VikunjaService implements VikunjaServiceInterface {
     private readonly perPage: number = config.perPage,
   ) {}
 
-  // Returns the tickets in the kanban column whose title matches `column` (case-insensitive).
+  // Returns the tasks in the kanban column whose title matches `column` (case-insensitive).
   // Resolves to an empty array when the column is empty or does not exist.
-  async getTickets(column: VikunjaColumn): Promise<VikunjaTaskInterface[]> {
+  async getTasks(column: VikunjaColumn): Promise<VikunjaTaskInterface[]> {
     const buckets = await this.listBuckets()
     const wanted = column.toLowerCase()
-    const tickets: VikunjaTaskInterface[] = []
+    const tasks: VikunjaTaskInterface[] = []
 
     for (const bucket of buckets) {
       if (bucket.title.toLowerCase() === wanted) {
         // Vikunja sends `tasks: null` for an empty bucket, so default to an empty list.
-        tickets.push(...(bucket.tasks ?? []))
+        tasks.push(...(bucket.tasks ?? []))
       }
     }
 
-    return tickets
+    return tasks
   }
 
-  // Returns the tickets in the Ready column that no other ticket blocks.
-  async getReadyUnblockedTickets(): Promise<VikunjaTaskInterface[]> {
-    const ready = await this.getTickets(vikunjaColumns.ready)
+  // Returns the tasks in the Ready column that no other task blocks.
+  async getReadyUnblockedTasks(): Promise<VikunjaTaskInterface[]> {
+    const ready = await this.getTasks(vikunjaColumns.ready)
 
     // Vikunja lists blockers under related_tasks.blocked and omits related_tasks when a task has no relations,
-    // so a missing field means the ticket is not blocked.
-    return ready.filter((ticket) => (ticket.related_tasks?.blocked ?? []).length === 0)
+    // so a missing field means the task is not blocked.
+    return ready.filter((task) => (task.related_tasks?.blocked ?? []).length === 0)
   }
 
-  // Finds the destination by title, then asks Vikunja to move the ticket into that bucket.
-  async moveToColumn(ticketId: number, column: VikunjaColumn): Promise<void> {
+  // Finds the destination by title, then asks Vikunja to move the task into that bucket.
+  async moveToColumn(taskId: number, column: VikunjaColumn): Promise<void> {
     const buckets = await this.listBuckets()
     const bucket = buckets.find((candidate) => candidate.title.toLowerCase() === column.toLowerCase())
 
@@ -53,7 +53,7 @@ export class VikunjaService implements VikunjaServiceInterface {
 
     const path = `/projects/${this.projectId}/views/${this.viewId}/buckets/${bucket.id}/tasks`
     const res = await this.vikunjaAPI.post(path, {
-      task_id: ticketId,
+      task_id: taskId,
       bucket_id: bucket.id,
       project_view_id: this.viewId,
       project_id: this.projectId,
@@ -64,14 +64,14 @@ export class VikunjaService implements VikunjaServiceInterface {
     }
   }
 
-  // Read every page of labels attached to the ticket through the API client.
-  async getLabels(ticketId: number): Promise<VikunjaLabelInterface[]> {
+  // Read every page of labels attached to the task through the API client.
+  async getLabels(taskId: number): Promise<VikunjaLabelInterface[]> {
     const labels: VikunjaLabelInterface[] = []
     let page = 1
     let totalPages = 1
 
     while (page <= totalPages) {
-      const path = `/tasks/${ticketId}/labels?page=${page}`
+      const path = `/tasks/${taskId}/labels?page=${page}`
       const res = await this.vikunjaAPI.get(path)
 
       if (!res.ok) {
@@ -87,9 +87,9 @@ export class VikunjaService implements VikunjaServiceInterface {
     return labels
   }
 
-  // Attach one existing label, leaving all other ticket labels intact.
-  async addLabel(ticketId: number, labelId: number): Promise<void> {
-    const path = `/tasks/${ticketId}/labels`
+  // Attach one existing label, leaving all other task labels intact.
+  async addLabel(taskId: number, labelId: number): Promise<void> {
+    const path = `/tasks/${taskId}/labels`
     const res = await this.vikunjaAPI.put(path, { label_id: labelId })
 
     if (!res.ok) {
@@ -97,7 +97,7 @@ export class VikunjaService implements VikunjaServiceInterface {
     }
   }
 
-  // Loads every bucket of the kanban view, each with its tickets.
+  // Loads every bucket of the kanban view, each with its tasks.
   private async listBuckets(): Promise<VikunjaBucketInterface[]> {
     const path = `/projects/${this.projectId}/views/${this.viewId}/tasks?per_page=${this.perPage}`
 

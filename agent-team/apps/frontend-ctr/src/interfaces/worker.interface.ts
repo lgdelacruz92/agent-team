@@ -1,6 +1,6 @@
 // Contract for a worker the scheduler schedules tickets onto. The Controller only talks to workers through
 // this, so adding a worker is a config change and the scheduling code does not change.
-import type { TaskInterface } from "./task.interface.js"
+import type { TicketInterface } from "./ticket.interface.js"
 
 // A worker the scheduler can start a ticket on, watch while it runs and clean up after.
 // One worker runs one ticket at a time, so a session id is enough to address its work.
@@ -16,7 +16,7 @@ export interface WorkerInterface {
   isAvailable(): Promise<boolean>
 
   // Opens a session for the ticket, sends its prompt and returns the session id to store on the ticket.
-  create(task: TaskInterface): Promise<string>
+  create(ticket: TicketInterface): Promise<string>
 
   // Stops the turn in progress. The session keeps its context.
   abort(sessionId: string): Promise<void>
