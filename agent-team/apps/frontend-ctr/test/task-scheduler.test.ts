@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { TaskInterface } from "../src/interfaces/task.interface.js"
+import { taskColumns } from "../src/interfaces/taskmanager.interface.js"
 import type { TaskManagerInterface } from "../src/interfaces/taskmanager.interface.js"
 import type { WorkerInterface } from "../src/interfaces/worker.interface.js"
 import { TaskScheduler } from "../src/services/task-scheduler.js"
@@ -53,6 +54,7 @@ describe("TaskScheduler", () => {
       getReviewTasks: async () => [],
       getRetryTasks: async () => [],
       getDoneTasks: async () => [],
+      moveTo: async () => {},
     }
     const first = makeWorker("first")
     const second = makeWorker("second")
@@ -77,13 +79,18 @@ describe("TaskScheduler", () => {
 
   it("restores saved sessions and preserves them when another worker starts a task", async () => {
     const sessionsFile = join(directory, "data", "sessions.json")
+    const tasks: TaskInterface[] = [1, 2].map((ticketId) => ({ ticketId, title: `Task ${ticketId}`, description: "" }))
     const taskManager: TaskManagerInterface = {
-      getTasks: async () => [{ ticketId: 1, title: "Task 1", description: "" }],
+      getTasks: async () => [...tasks],
       getReadyTasks: async () => [],
       getInProgressTasks: async () => [],
       getReviewTasks: async () => [],
       getRetryTasks: async () => [],
       getDoneTasks: async () => [],
+      moveTo: async (ticketId) => {
+        const index = tasks.findIndex((task) => task.ticketId === ticketId)
+        tasks.splice(index, 1)
+      },
     }
     const first = makeWorker("first")
     const second = makeWorker("second")
@@ -92,6 +99,8 @@ describe("TaskScheduler", () => {
     expect(JSON.parse(await readFile(sessionsFile, "utf8"))).toEqual({ first: "session-first" })
 
     await new TaskScheduler(taskManager, [second.worker], sessionsFile).tick()
+    expect(first.worker.create).toHaveBeenCalledWith(expect.objectContaining({ ticketId: 1 }))
+    expect(second.worker.create).toHaveBeenCalledWith(expect.objectContaining({ ticketId: 2 }))
     expect(JSON.parse(await readFile(sessionsFile, "utf8"))).toEqual({
       first: "session-first",
       second: "session-second",
@@ -108,6 +117,7 @@ describe("TaskScheduler", () => {
       getReviewTasks: async () => [],
       getRetryTasks: async () => [],
       getDoneTasks: async () => [],
+      moveTo: async () => {},
     }
 
     expect(() => new TaskScheduler(taskManager, [], sessionsFile)).toThrow("Invalid session for worker first")
@@ -124,6 +134,7 @@ describe("TaskScheduler", () => {
       getReviewTasks: async () => [],
       getRetryTasks: async () => [],
       getDoneTasks: async () => [],
+      moveTo: async () => {},
     }
     const first = makeWorker("first")
     const second = makeWorker("second")
@@ -138,5 +149,55 @@ describe("TaskScheduler", () => {
     scheduler.paused = true
     await scheduler.tick()
     expect(JSON.parse(await readFile(sessionsFile, "utf8"))).toEqual({ first: "session-first" })
+  })
+
+  it("retries a failed move without creating the task again", async () => {
+    const task: TaskInterface = { ticketId: 1, title: "Task 1", description: "" }
+    const moveTo = vi.fn<TaskManagerInterface["moveTo"]>()
+      .mockRejectedValueOnce(new Error("board unavailable"))
+      .mockRejectedValueOnce(new Error("board unavailable"))
+      .mockResolvedValue(undefined)
+    const taskManager: TaskManagerInterface = {
+      getTasks: async () => [task],
+      getReadyTasks: async () => [],
+      getInProgressTasks: async () => [],
+      getReviewTasks: async () => [],
+      getRetryTasks: async () => [],
+      getDoneTasks: async () => [],
+      moveTo,
+    }
+    const first = makeWorker("first")
+    const second = makeWorker("second")
+    const scheduler = new TaskScheduler(taskManager, [first.worker, second.worker], join(directory, "sessions.json"))
+
+    await scheduler.tick()
+    await scheduler.tick()
+    expect(first.worker.create).toHaveBeenCalledTimes(1)
+    expect(second.worker.create).not.toHaveBeenCalled()
+    expect(moveTo).toHaveBeenCalledWith(1, taskColumns.inProgress)
+
+    scheduler.paused = true
+    await scheduler.tick()
+    expect(moveTo).toHaveBeenCalledTimes(3)
+    expect(second.worker.create).not.toHaveBeenCalled()
+  })
+
+  it("does not move a task when starting its worker fails", async () => {
+    const moveTo = vi.fn<TaskManagerInterface["moveTo"]>()
+    const taskManager: TaskManagerInterface = {
+      getTasks: async () => [{ ticketId: 1, title: "Task 1", description: "" }],
+      getReadyTasks: async () => [],
+      getInProgressTasks: async () => [],
+      getReviewTasks: async () => [],
+      getRetryTasks: async () => [],
+      getDoneTasks: async () => [],
+      moveTo,
+    }
+    const { worker } = makeWorker("first")
+    worker.create = vi.fn().mockRejectedValue(new Error("worker unavailable"))
+    const scheduler = new TaskScheduler(taskManager, [worker], join(directory, "sessions.json"))
+
+    await scheduler.tick()
+    expect(moveTo).not.toHaveBeenCalled()
   })
 })

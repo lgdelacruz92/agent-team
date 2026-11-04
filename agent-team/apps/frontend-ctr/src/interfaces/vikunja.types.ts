@@ -1,13 +1,8 @@
 // Types for the Vikunja REST client.
+import { taskColumns } from "./taskmanager.interface.js"
 
-// Kanban column titles used by the controller.
-export const vikunjaColumns = {
-  ready: "Ready",
-  inProgress: "In progress",
-  review: "Review",
-  retry: "Retry",
-  done: "Done",
-} as const
+// Vikunja uses the same kanban column titles as the controller.
+export const vikunjaColumns = taskColumns
 
 // A column title accepted by the Vikunja service.
 export type VikunjaColumn = (typeof vikunjaColumns)[keyof typeof vikunjaColumns]

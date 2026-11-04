@@ -2,7 +2,7 @@
 // It is the bridge between the Vikunja service and the scheduler, so neither needs to know about the other.
 
 import type { TaskInterface } from "../interfaces/task.interface.js"
-import type { TaskManagerInterface } from "../interfaces/taskmanager.interface.js"
+import type { TaskColumn, TaskManagerInterface } from "../interfaces/taskmanager.interface.js"
 import type { VikunjaServiceInterface } from "../interfaces/vikunja.service.interface.js"
 import { vikunjaColumns } from "../interfaces/vikunja.types.js"
 import type { VikunjaColumn, VikunjaTaskInterface } from "../interfaces/vikunja.types.js"
@@ -52,6 +52,15 @@ export class TaskManager implements TaskManagerInterface {
   // Tasks that are complete.
   getDoneTasks(): Promise<TaskInterface[]> {
     return this.tasksIn(vikunjaColumns.done)
+  }
+
+  // Vikunja identifies tasks by number, even though other task sources may use string IDs.
+  async moveTo(ticketId: TaskInterface["ticketId"], column: TaskColumn): Promise<void> {
+    if (typeof ticketId !== "number") {
+      throw new Error(`Vikunja task ID must be a number: ${ticketId}`)
+    }
+
+    await this.vikunja.moveToColumn(ticketId, column)
   }
 
   // Reads one kanban column through the service and converts its tickets, in the order Vikunja returns them.

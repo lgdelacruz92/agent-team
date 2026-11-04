@@ -6,6 +6,7 @@ import { mkdir, rename, rm, writeFile } from "node:fs/promises"
 import { dirname } from "node:path"
 import { config } from "../config.js"
 import type { SnapshotInterface } from "../interfaces/snapshot.interface.js"
+import { taskColumns } from "../interfaces/taskmanager.interface.js"
 import type { TaskManagerInterface } from "../interfaces/taskmanager.interface.js"
 import type { WorkerInterface } from "../interfaces/worker.interface.js"
 
@@ -46,10 +47,9 @@ export class TaskScheduler {
     skipped: [],
   }
 
-  // Ids of tasks already handed to a worker. A task stays in the Ready column after it is dispatched (nothing moves
-  // it yet), so without this the next tick would hand the same task to another worker. In memory only: a restart
-  // forgets it.
+  // Avoid handing the same task to another worker while its board move is pending or the task list is stale.
   private readonly dispatched = new Set<string | number>()
+  private readonly pendingMoves = new Set<string | number>()
 
   // The scheduler asks the task manager for ready tasks whenever a worker is free, so it holds no queue of its own.
   constructor(
@@ -123,6 +123,9 @@ export class TaskScheduler {
         await this.saveSessions()
       }
 
+      // Finish a failed board update before handing out more work, even when paused.
+      await this.movePendingTasks()
+
       if (!this.paused) {
         await this.dispatchNext()
       }
@@ -157,11 +160,21 @@ export class TaskScheduler {
     this.workers.splice(this.workers.indexOf(worker), 1)
     this.busyWorkers.push(worker)
     this.dispatched.add(task.ticketId)
+    this.pendingMoves.add(task.ticketId)
     this.sessions.set(worker.id, sessionId)
     this.sessionsDirty = true
     await this.saveSessions()
+    await this.movePendingTasks()
 
     log(`task ${task.ticketId} -> worker ${worker.id}`)
+  }
+
+  // Keep a failed move pending so a later tick can retry without starting the task again.
+  private async movePendingTasks(): Promise<void> {
+    for (const ticketId of this.pendingMoves) {
+      await this.taskManager.moveTo(ticketId, taskColumns.inProgress)
+      this.pendingMoves.delete(ticketId)
+    }
   }
 
   // The first worker that is available: reachable and not working on a session.
