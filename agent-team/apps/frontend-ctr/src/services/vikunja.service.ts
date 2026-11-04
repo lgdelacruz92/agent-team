@@ -70,6 +70,21 @@ export class VikunjaService implements VikunjaServiceInterface {
     }
   }
 
+  // Attach one existing label, leaving all other ticket labels intact.
+  async addLabel(ticketId: number, labelId: number): Promise<void> {
+    const path = `/tasks/${ticketId}/labels`
+    const res = await fetch(`${this.baseUrl}/api/v1${path}`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${this.token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ label_id: labelId }),
+      signal: AbortSignal.timeout(this.timeoutMs),
+    })
+
+    if (!res.ok) {
+      throw new Error(`Vikunja PUT ${path} returned ${res.status}: ${await res.text()}`)
+    }
+  }
+
   // Loads every bucket of the kanban view, each with its tickets.
   private async listBuckets(): Promise<VikunjaBucketInterface[]> {
     const path = `/projects/${this.projectId}/views/${this.viewId}/tasks?per_page=${this.perPage}`

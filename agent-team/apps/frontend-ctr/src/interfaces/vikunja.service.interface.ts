@@ -14,4 +14,7 @@ export interface VikunjaServiceInterface {
 
   // Moves a ticket to the column with this title (case-insensitive). Throws if the column does not exist.
   moveToColumn(ticketId: number, column: VikunjaColumn): Promise<void>
+
+  // Adds an existing label to a ticket without changing its other labels.
+  addLabel(ticketId: number, labelId: number): Promise<void>
 }
