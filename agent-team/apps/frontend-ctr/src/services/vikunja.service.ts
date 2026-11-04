@@ -11,9 +11,6 @@ import type { VikunjaBucketInterface, VikunjaColumn, VikunjaTaskInterface } from
 export class VikunjaService implements VikunjaServiceInterface {
   constructor(
     private readonly vikunjaAPI: VikunjaAPIInterface,
-    private readonly baseUrl: string = config.vikunjaUrl,
-    private readonly token: string = config.vikunjaToken,
-    private readonly timeoutMs: number = config.vikunjaTimeoutMs,
     private readonly projectId: number = config.projectId,
     private readonly viewId: number = config.viewId,
     private readonly perPage: number = config.perPage,
@@ -55,16 +52,11 @@ export class VikunjaService implements VikunjaServiceInterface {
     }
 
     const path = `/projects/${this.projectId}/views/${this.viewId}/buckets/${bucket.id}/tasks`
-    const res = await fetch(`${this.baseUrl}/api/v1${path}`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${this.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        task_id: ticketId,
-        bucket_id: bucket.id,
-        project_view_id: this.viewId,
-        project_id: this.projectId,
-      }),
-      signal: AbortSignal.timeout(this.timeoutMs),
+    const res = await this.vikunjaAPI.post(path, {
+      task_id: ticketId,
+      bucket_id: bucket.id,
+      project_view_id: this.viewId,
+      project_id: this.projectId,
     })
 
     if (!res.ok) {
@@ -86,10 +78,7 @@ export class VikunjaService implements VikunjaServiceInterface {
   private async listBuckets(): Promise<VikunjaBucketInterface[]> {
     const path = `/projects/${this.projectId}/views/${this.viewId}/tasks?per_page=${this.perPage}`
 
-    const res = await fetch(`${this.baseUrl}/api/v1${path}`, {
-      headers: { Authorization: `Bearer ${this.token}` },
-      signal: AbortSignal.timeout(this.timeoutMs),
-    })
+    const res = await this.vikunjaAPI.get(path)
 
     if (!res.ok) {
       throw new Error(`Vikunja GET ${path} returned ${res.status}: ${await res.text()}`)
