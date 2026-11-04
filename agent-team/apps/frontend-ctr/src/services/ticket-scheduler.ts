@@ -147,9 +147,14 @@ export class TicketScheduler {
       return
     }
 
+    // Find ready tickets
+    // ready means unblocked, in ready, or retry column
     const readyTickets = await this.ticketManager.getTickets()
+
+    // Check the dispatched array if ticket has already been dispatched
     const ticket = readyTickets.find((candidate) => !this.dispatched.has(candidate.ticketId))
 
+    // no ready tickets continue
     if (!ticket) {
       return
     }
@@ -157,13 +162,29 @@ export class TicketScheduler {
     // Remember the ticket only after create() succeeds, so a failed start leaves it eligible for the next tick.
     const sessionId = await worker.create(ticket)
 
+    // remove the worker from the available worker. This means worker is working on the ticket
     this.workers.splice(this.workers.indexOf(worker), 1)
+
+    // Add the worker into busy workers list
     this.busyWorkers.push(worker)
+
+    // Record that the ticket has been dispatched
     this.dispatched.add(ticket.ticketId)
+
+    // Make it a pending move incase interruption happens we can come back to where we left off
     this.pendingMoves.add(ticket.ticketId)
+
+    // Keep a record of worker.id and session id association
     this.sessions.set(worker.id, sessionId)
+
+    // Preparing a change in persistent session record
     this.sessionsDirty = true
+
+    // Save the session. If this fails this.sessionDirty is still true and we
+    // have a change to try later
     await this.saveSessions()
+
+    // When sessions are save we can move ticket
     await this.movePendingTickets()
 
     log(`ticket ${ticket.ticketId} -> worker ${worker.id}`)
