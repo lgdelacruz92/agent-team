@@ -1,6 +1,6 @@
 # Scheduler v2 scaffold
 
-Estimated reading time: 1 minute (150 WPM)
+Estimated reading time: 2 minutes (150 WPM)
 
 Standalone TypeScript Express app with SQLite persistence. No scheduling, worker dispatch, or Vikunja integration yet. The existing `frontend-ctr` stays separate.
 
@@ -47,4 +47,35 @@ npm run build
 npm start
 ```
 
-SQLite currently holds generic key/value state. Ticket and worker models can come later.
+## Table stores
+
+`src/db/stores-doc.md` defines the three domain tables:
+
+- `TicketStore`: tickets, including a unique Vikunja task ID.
+- `AgentStore`: agents and their status.
+- `AssignmentStore`: ticket-to-agent history and timestamps.
+
+Open one shared connection and pass it to each store:
+
+```ts
+import { openDatabase } from "./src/db/database.js"
+import { TicketStore } from "./src/db/ticket-store.js"
+import { AgentStore } from "./src/db/agent-store.js"
+import { AssignmentStore } from "./src/db/assignment-store.js"
+
+const database = openDatabase("data/scheduler.sqlite")
+const tickets = new TicketStore(database)
+const agents = new AgentStore(database)
+const assignments = new AssignmentStore(database)
+
+// Close only after every store is finished.
+database.close()
+```
+
+Each store exposes `create`, `get`, `list`, `update`, and `delete`. Updates replace all mutable fields; missing records return `undefined`. Deletion returns whether a record was removed.
+
+SQLite generates local IDs. IDs use JavaScript numbers within the safe integer range. Timestamps use ISO 8601 strings; new assignments default to the current UTC time and a null completion time. Status values remain unrestricted strings.
+
+Foreign keys prevent orphan assignments and deletion of referenced tickets or agents. Delete assignments explicitly first. The stores do not impose scheduling rules.
+
+The existing HTTP endpoints still use `StateStore` for generic JSON state. Table stores have no HTTP routes or scheduling integration yet.
