@@ -6,7 +6,7 @@ import { join } from "node:path"
 import type { AddressInfo } from "node:net"
 import { after, test } from "node:test"
 import { createApp } from "../src/app.js"
-import { StateStore } from "../src/state-store.js"
+import { StateStore } from "../src/db/state-store.js"
 
 const store = new StateStore(":memory:")
 const server = createApp(store).listen(0, "127.0.0.1")

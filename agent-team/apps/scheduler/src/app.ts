@@ -1,7 +1,7 @@
 // Creates the dummy Express app without starting a server or dispatching work.
 import express from "express"
 import type { ErrorRequestHandler } from "express"
-import type { StateStore } from "./state-store.js"
+import type { StateStore } from "./db/state-store.js"
 
 // The database is injected so tests can use a temporary or in-memory store.
 export function createApp(store: StateStore) {

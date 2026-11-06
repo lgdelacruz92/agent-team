@@ -1,7 +1,7 @@
 // Starts the standalone Express server and closes SQLite on shutdown.
 import { createApp } from "./app.js"
 import { config } from "./config.js"
-import { StateStore } from "./state-store.js"
+import { StateStore } from "./db/state-store.js"
 
 const store = new StateStore(config.databasePath)
 const server = createApp(store).listen(config.port, config.host, () => {
