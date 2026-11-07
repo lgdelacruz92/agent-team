@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs"
 import { dirname } from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { openDatabase } from "../../src/db/database.js"
+import { seedSharedTables } from "../../src/db/seed-shared.js"
 
 export function createTestDatabase(path = ":memory:"): DatabaseSync {
   if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true })
@@ -33,6 +34,7 @@ export function createTestDatabase(path = ":memory:"): DatabaseSync {
     CREATE INDEX assignments_ticket_id ON assignments(ticket_id);
     CREATE INDEX assignments_agent_id ON assignments(agent_id);
   `)
+  seedSharedTables(database)
   if (path === ":memory:") return database
   database.close()
   return openDatabase(path)

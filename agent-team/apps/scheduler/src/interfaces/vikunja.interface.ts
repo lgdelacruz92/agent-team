@@ -11,4 +11,7 @@ export interface VikunjaTicket {
 export interface VikunjaInterface {
   // Fetch every card from the configured Kanban board; column titles are ticket statuses.
   getTickets(): Promise<VikunjaTicket[]>
+
+  // Move an exhausted ticket to the board's Flagged tickets column.
+  moveToFlagged(vikunjaTaskId: number): Promise<void>
 }

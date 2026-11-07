@@ -31,6 +31,9 @@ export interface SchedulerDatabaseInterface {
   // Return present, unassigned Ready and Retry tickets in local ID order.
   getReadyTickets(): Promise<SchedulerTicket[]>
 
+  // Count recorded work requests for a ticket across all its assignments.
+  countAttempts(ticketId: number): Promise<number>
+
   // Create an assignment atomically without changing the ticket or agent status.
   // Reject missing/non-ready tickets, unavailable agents, and duplicate active assignments.
   createAssignment(assignment: NewAssignment): Promise<Assignment>

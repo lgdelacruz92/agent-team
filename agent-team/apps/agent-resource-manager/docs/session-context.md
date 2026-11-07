@@ -1,6 +1,6 @@
 # Agent resource manager session context
 
-Estimated reading time: 46 minutes (150 WPM)
+Estimated reading time: 47 minutes (150 WPM)
 
 ## Working agreement
 
@@ -13,13 +13,13 @@ Estimated reading time: 46 minutes (150 WPM)
 - **Initial app started.** `src/interfaces/resource-manager.interface.ts` defines one reconciliation pass. `src/index.ts` starts an idle process loop without creating a Resource Manager. The Resource Manager class and its reconciliation behavior are not implemented yet. Continue modelling the app's entity interfaces.
 - The user decided the manager will fetch the full ticket description from Vikunja and send it to the agent. The scheduler's ticket table stores the title but not the description. If fetching fails, keep the assignment reserved, retry, alert a human if the failure persists, and do not count it as an agent attempt. Other payload details and the alert threshold remain to be worked out.
 - Remaining A1 topics: identify and recover OpenCode sessions after uncertain starts or restarts; determine evidence of success, failure, and availability; and prevent another controller from dispatching to the same worker concurrently. Inspect the real OpenCode API and existing frontend controller rather than assuming their behavior.
-- Build iteratively, starting with entity interfaces. Session tracking, shared database-lock coordination, and Ticket Scheduler changes remain necessary before real automatic dispatch and release. The attempt timeout and maximum attempts remain unset. No real agents or infrastructure were started or changed in this session.
-- Decisions so far: keep numeric `agents.id` and add a URL field for the containerized OpenCode server; user favors an `executions` table for debugging; the Resource Manager polls every agent each tick and is final authority on outcomes. An agent that stops processing and is ready for the next task means the attempt succeeded; no task criteria or results are verified. Too slow or unreachable means failed. Successful work goes to Vikunja `Done`, and failed work goes to `Retry`. The Ticket Scheduler checks the attempt limit and moves tickets at the limit to `Flagged tickets`; the first attempt counts as 1. For a failed attempt, the manager tries to stop the session but permits a new session even if stopping cannot be confirmed. The user accepts possible overlap and plans a separate session-cleanup cronjob. The attempt limit, timeout, agent availability, and completion protocol remain open. The user will redo conflicting agent instructions later.
+- Build iteratively, starting with entity interfaces. Resource Manager session tracking, shared database-lock coordination, and controlled cross-app tests remain necessary before real automatic dispatch and release. The timeout remains unset. The Ticket Scheduler now defaults to 3 total attempts, configurable. No real agents or infrastructure were started or changed in this session.
+- Decisions so far: keep numeric `agents.id` and add a URL field for the containerized OpenCode server; user favors an `executions` table for debugging; the Resource Manager polls every agent each tick and is final authority on outcomes. An agent that stops processing and is ready for the next task means the attempt succeeded; no task criteria or results are verified. Too slow or unreachable means failed. Successful work goes to Vikunja `Done`, and failed work goes to `Retry`. The Ticket Scheduler checks the attempt limit and moves tickets at the limit to `Flagged tickets`; the first attempt counts as 1. For a failed attempt, the manager tries to stop the session but permits a new session even if stopping cannot be confirmed. The user accepts possible overlap and plans a separate session-cleanup cronjob. Timeout, availability, and completion implementation details remain to be worked out. The user will redo conflicting agent instructions later.
 
 ## Current state
 
 - The app has a runnable idle process loop, but no Resource Manager implementation or integrations. No agent startup or infrastructure changes have been requested.
-- Read the [scheduler handoff](../../scheduler/docs/agent-resource-manager.md) for agreed boundaries, current behavior, and open design questions. Check the linked source before designing an integration.
+- Read the [shared data reference](../../scheduler/docs/shared-data.md) and this app's [data design](data.md) for agreed boundaries and the current scheduler behavior. Check the scheduler source before designing an integration.
 - The scheduler records assignments in shared SQLite. An incomplete assignment reserves its ticket and agent; it does not prove work has started.
 - The intended manager will reconcile real agent state, report progress, and move Vikunja cards. Lifecycle, recovery, and completion coordination remain undecided.
 

@@ -1,8 +1,8 @@
 # Scheduler v2 scaffold
 
-Estimated reading time: 11 minutes (150 WPM)
+Estimated reading time: 12 minutes (150 WPM)
 
-Standalone TypeScript Express app with SQLite persistence, local agent assignment, and Vikunja Kanban fetching. `index.ts` runs `Scheduler.runOnce()` continuously. Assignment reserves a local agent; it does not start an OpenCode session or move a card. The future resource manager will handle agent execution and card movement; it is not implemented. The existing `frontend-ctr` stays separate.
+Standalone TypeScript Express app with SQLite persistence, local agent assignment, and Vikunja Kanban fetching. `index.ts` runs `Scheduler.runOnce()` continuously. Assignment reserves a local agent; it does not start an OpenCode session or move a card. The scheduler moves exhausted retries to `Flagged tickets`; the future resource manager will handle execution and other lifecycle card moves. The resource manager is not implemented. The existing `frontend-ctr` stays separate.
 
 ## Run
 
@@ -24,7 +24,7 @@ Defaults to `http://127.0.0.1:3300`. No authentication: keep it local.
 - `SCHEDULER_DB_PATH`: default `data/scheduler.sqlite`, relative to the working directory.
 - `SCHEDULER_POLL_MS`: wait after each completed pass, default `30000` (30 seconds). Must be an integer from 1 through 2147483647.
 - `SCHEDULER_ASSIGNMENT_WARNING_MS`: age at which to warn about an incomplete `assigned` record, and minimum time between repeated warnings. Default `600000` (10 minutes); must be a positive safe integer.
-- `SCHEDULER_MAX_ATTEMPTS`: total attempts allowed, including the first; defaults to `3` and must be a positive safe integer. This setting is not enforced yet: execution counting and retry-limit checks remain unimplemented.
+- `SCHEDULER_MAX_ATTEMPTS`: total attempts allowed, including the first; defaults to `3` and must be a positive safe integer. An exhausted `Retry` ticket is moved to `Flagged tickets` instead of being assigned.
 - `VIKUNJA_URL`: required server URL, without `/api/v1`.
 - `VIKUNJA_API_TOKEN`: required API token.
 - `VIKUNJA_PROJECT_ID`: required positive project ID.
@@ -39,7 +39,7 @@ The database and tables must already exist; the scheduler does not create or mig
 - `GET /health`: liveness check.
 - `GET /status`: scheduling pass status. Returns `running`, `lastSucceededAt`, `lastFailedAt`, and `lastResult` (`success`, `failure`, or `null`). Times are UTC ISO strings; timestamps and result are `null` until the corresponding event occurs. While a pass is running, `lastResult` describes the previous completed pass.
 
-`/status` returns HTTP 200 even when the last pass failed; inspect the fields and logs to assess progress. A successful pass may find no tickets or available agents, and assignment warning-check failures are logged separately. Status is held in memory and resets when the app restarts. `/health` remains a process-liveness check, not a scheduler or watcher health check.
+`/status` returns HTTP 200 even when the last pass failed; inspect the fields and logs to assess progress. A successful pass may find no tickets or available agents, or skip work because the shared lock is held. Assignment warning-check failures are logged separately. Status is held in memory and resets when the app restarts. `/health` remains a process-liveness check, not a scheduler or watcher health check.
 
 ## Checks
 
@@ -55,6 +55,12 @@ npm start
 `src/components/vikunja.ts` reads one existing Kanban board. `index.ts` constructs the components from environment settings and starts `runSchedulerLoop` after the HTTP server begins listening. The first pass starts immediately; after every pass, the loop waits `SCHEDULER_POLL_MS` and repeats. Passes never overlap. Errors are logged and retried after the same wait; HTTP endpoints remain available.
 
 SIGINT or SIGTERM stops the loop and cancels its polling wait. An active pass finishes before the SQLite connection closes. `Scheduler.runOnce()` remains one pass; repetition lives in `src/scheduler-loop.ts`.
+
+Each pass acquires the shared `ticket-scheduling` lock before fetching the board and releases it after scheduling. If held, the pass skips work and retries on the next tick. Lock owners are unique; only the owner releases its row. A process crash can leave a lock for human review, with no automatic cleanup. The Resource Manager does not use the lock yet, so cross-app coordination is not complete.
+
+Before assigning a `Retry` ticket, the scheduler counts executions with `work_requested_at` recorded across its assignments. At the limit, it moves the card to the board's exact `Flagged tickets` column instead of assigning it. The board must have exactly one such column. The scheduler holds the shared lock during the move and updates its local ticket status on a later board fetch.
+
+If the count or move fails, the pass fails without creating an assignment. The loop logs the error and fetches the board again on the next pass: if the card is already flagged, it is ineligible; if still in `Retry`, the scheduler retries the move. A persistently failing first ticket can hold up later tickets. An uncertain result may mean the move already happened.
 
 `SchedulerDatabase.syncTickets()` atomically reconciles a complete successful fetch: it creates or updates tickets by Vikunja task ID, preserving local IDs and copying title, status, and priority exactly. Fetched tickets have `present_on_board = 1`; missing tickets have `present_on_board = 0` and remain in the database along with their assignments. Missing tickets are not eligible for new assignments, and become eligible again when they reappear in `Ready` or `Retry`. A failed fetch leaves presence unchanged and the pass does not assign work. A database error rolls back the entire sync.
 

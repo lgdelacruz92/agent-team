@@ -15,9 +15,9 @@ The loop logs that it is idle every 30 seconds. Stop it with Ctrl+C. To run the 
 
 For the shared database prerequisite, see [setup](docs/setup.md).
 
-**Start here:** read the [scheduler handoff](../scheduler/docs/agent-resource-manager.md) for the agreed responsibilities, current database behavior, example lifecycle, and decisions still open. Then check the linked scheduler source before designing an integration.
+**Start here:** read the [data design](docs/data.md) and [session context](docs/session-context.md) for the agreed directions and remaining work. The scheduler's [shared data reference](../scheduler/docs/shared-data.md) describes its side of the integration; check the scheduler source before implementing it.
 
-The handoff is context for future work, not authorization to start agents, modify infrastructure, or implement the app without a request.
+These notes are context for future work, not authorization to start agents, modify infrastructure, or implement the app without a request.
 
 For session decisions and current progress, read [session context](docs/session-context.md).
 

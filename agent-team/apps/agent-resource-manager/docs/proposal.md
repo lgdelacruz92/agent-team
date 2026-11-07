@@ -2,7 +2,7 @@
 
 Estimated reading time: 8 minutes (150 WPM)
 
-**Status: proposal, not an approved contract or an implementation.** Start with the [flowchart](flowchart.md). Existing scheduler responsibilities and open questions are in the [scheduler handoff](../../scheduler/docs/agent-resource-manager.md).
+**Status: proposal, not an approved contract or an implementation.** Start with the [flowchart](flowchart.md). The [scheduler's shared data reference](../../scheduler/docs/shared-data.md) records its current integration responsibilities.
 
 ## Goal
 

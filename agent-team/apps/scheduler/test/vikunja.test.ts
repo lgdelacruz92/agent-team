@@ -170,3 +170,73 @@ test("Vikunja rejects missing credentials and invalid connection settings", () =
     assert.throws(() => new Vikunja({ ...options, ...changes }))
   }
 })
+
+test("moveToFlagged finds the exact column and posts the scoped authenticated move", async () => {
+  const calls: string[] = []
+  const request: typeof fetch = async (url, init) => {
+    calls.push(`${init?.method ?? "GET"} ${String(url)}`)
+    assert.equal(new Headers(init?.headers).get("Authorization"), "Bearer test-token")
+    assert.ok(init?.signal instanceof AbortSignal)
+    if (init?.method !== "POST") {
+      return json([
+        bucket(1, "Retry", 42),
+        { id: 9, title: "Flagged tickets", count: 0, tasks: null },
+      ])
+    }
+    assert.equal(new Headers(init.headers).get("Content-Type"), "application/json")
+    assert.deepEqual(JSON.parse(String(init.body)), {
+      task_id: 42, bucket_id: 9, project_view_id: 12, project_id: 3,
+    })
+    return new Response(null, { status: 200 })
+  }
+  await new Vikunja(options, request).moveToFlagged(42)
+  assert.deepEqual(calls, [
+    "GET https://vikunja.example/api/v1/projects/3/views/12/tasks?page=1&per_page=50",
+    "POST https://vikunja.example/api/v1/projects/3/views/12/buckets/9/tasks",
+  ])
+})
+
+test("moveToFlagged rejects invalid task IDs without a request", async () => {
+  const request: typeof fetch = async () => { assert.fail("no request expected") }
+  for (const id of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+    await assert.rejects(new Vikunja(options, request).moveToFlagged(id), /task ID must be a positive safe integer/)
+  }
+})
+
+test("moveToFlagged rejects missing or ambiguous destination columns without posting", async () => {
+  for (const board of [
+    [bucket(1, "Retry", 42)],
+    [bucket(1, "Flagged tickets", 42), bucket(2, "Flagged tickets", 43)],
+    [{ id: 0, title: "Flagged tickets", count: 0, tasks: [] }],
+  ]) {
+    const request: typeof fetch = async (_url, init) => {
+      assert.notEqual(init?.method, "POST")
+      return json(board)
+    }
+    await assert.rejects(new Vikunja(options, request).moveToFlagged(42), /exactly one|invalid Kanban bucket/)
+  }
+})
+
+test("moveToFlagged rejects HTTP and network failures without exposing response bodies", async () => {
+  for (const stage of ["board", "move"] as const) {
+    for (const status of [401, 404, 500]) {
+      const request: typeof fetch = async (_url, init) => {
+        if ((init?.method === "POST") === (stage === "move")) return new Response(options.token, { status })
+        return json([{ id: 9, title: "Flagged tickets", count: 0, tasks: [] }])
+      }
+      await assert.rejects(new Vikunja(options, request).moveToFlagged(42), (error: Error) => {
+        assert.match(error.message, new RegExp(`HTTP ${status}`))
+        assert.ok(!error.message.includes(options.token))
+        return true
+      })
+    }
+  }
+  for (const stage of ["board", "move"] as const) {
+    const error = new DOMException("Timed out", "TimeoutError")
+    const request: typeof fetch = async (_url, init) => {
+      if ((init?.method === "POST") === (stage === "move")) throw error
+      return json([{ id: 9, title: "Flagged tickets", count: 0, tasks: [] }])
+    }
+    await assert.rejects(new Vikunja(options, request).moveToFlagged(42), (actual) => actual === error)
+  }
+})

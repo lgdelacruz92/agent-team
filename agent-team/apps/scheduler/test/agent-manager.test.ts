@@ -128,6 +128,7 @@ test("assignTicket rejects non-ready tickets and propagates persistence failures
     const manager = new AgentManager({
       syncTickets: (tickets) => context.schedulerDatabase.syncTickets(tickets),
       getReadyTickets: () => context.schedulerDatabase.getReadyTickets(),
+      countAttempts: (ticketId) => context.schedulerDatabase.countAttempts(ticketId),
       async createAssignment() { throw error },
     }, context.agents, context.assignments)
     await assert.rejects(manager.assignTicket(context.ticket), (actual) => actual === error)

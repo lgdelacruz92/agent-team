@@ -5,6 +5,7 @@ import { AssignmentMonitor } from "./components/assignment-monitor.js"
 import { Scheduler } from "./components/scheduler.js"
 import { SchedulerDatabase } from "./components/scheduler-database.js"
 import { SchedulerStatus } from "./components/scheduler-status.js"
+import { SharedLock } from "./components/shared-lock.js"
 import { Vikunja } from "./components/vikunja.js"
 import { config } from "./config.js"
 import { openDatabase } from "./db/database.js"
@@ -22,7 +23,7 @@ const schedulerDatabase = new SchedulerDatabase(database)
 const assignments = new AssignmentStore(database)
 const agentManager = new AgentManager(schedulerDatabase, new AgentStore(database), assignments)
 const assignmentMonitor = new AssignmentMonitor(assignments, config.assignmentWarningMs)
-const scheduler = new Scheduler(vikunja, schedulerDatabase, agentManager)
+const scheduler = new Scheduler(vikunja, schedulerDatabase, agentManager, new SharedLock(database), config.maxAttempts)
 const status = new SchedulerStatus(scheduler)
 
 const schedulingController = new AbortController()

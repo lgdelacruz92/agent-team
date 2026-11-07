@@ -88,4 +88,18 @@ export class SchedulerDatabase implements SchedulerDatabaseInterface {
       && (ticket.status === "Ready" || ticket.status === "Retry")
       && !assignedTicketIds.has(ticket.id))
   }
+
+  async countAttempts(ticketId: number): Promise<number> {
+    const result = this.database.prepare(`
+      SELECT COUNT(*) AS count
+      FROM executions
+      JOIN assignments ON executions.assignment_id = assignments.id
+      WHERE assignments.ticket_id = ? AND executions.work_requested_at IS NOT NULL
+    `).get(ticketId)
+    const count = result?.count
+    if (typeof count !== "number" || !Number.isSafeInteger(count) || count < 0) {
+      throw new Error(`Invalid attempt count for ticket ${ticketId}`)
+    }
+    return count
+  }
 }

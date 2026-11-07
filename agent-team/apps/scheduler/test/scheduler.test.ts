@@ -4,6 +4,7 @@ import { test } from "node:test"
 import { Scheduler } from "../src/components/scheduler.js"
 import type { AgentManagerInterface } from "../src/interfaces/agent-manager.interface.js"
 import type { Assignment, SchedulerDatabaseInterface, SchedulerTicket } from "../src/interfaces/scheduler-database.interface.js"
+import type { SharedLockInterface } from "../src/interfaces/shared-lock.interface.js"
 import type { VikunjaInterface, VikunjaTicket } from "../src/interfaces/vikunja.interface.js"
 
 const readyTicket: SchedulerTicket = {
@@ -28,11 +29,16 @@ function setup() {
   const events: string[] = []
   const savedTickets: VikunjaTicket[] = []
   const assignedTickets: SchedulerTicket[] = []
+  const flaggedTaskIds: number[] = []
 
   const vikunja: VikunjaInterface = {
     async getTickets() {
       events.push("getTickets")
       return [readyTicket, retryTicket]
+    },
+    async moveToFlagged(taskId) {
+      events.push(`moveToFlagged:${taskId}`)
+      flaggedTaskIds.push(taskId)
     },
   }
   const database: SchedulerDatabaseInterface = {
@@ -43,6 +49,10 @@ function setup() {
     async getReadyTickets() {
       events.push("getReadyTickets")
       return [readyTicket, retryTicket]
+    },
+    async countAttempts(ticketId) {
+      events.push(`countAttempts:${ticketId}`)
+      return 0
     },
     async createAssignment() {
       assert.fail("Scheduler must leave assignment persistence to the agent manager")
@@ -56,8 +66,12 @@ function setup() {
     },
   }
 
-  const scheduler = new Scheduler(vikunja, database, agentManager)
-  return { scheduler, vikunja, database, agentManager, events, savedTickets, assignedTickets }
+  const lock: SharedLockInterface = {
+    async tryAcquire() { events.push("acquire"); return "owner" },
+    async release(owner) { assert.equal(owner, "owner"); events.push("release") },
+  }
+  const scheduler = new Scheduler(vikunja, database, agentManager, lock, 3)
+  return { scheduler, vikunja, database, agentManager, lock, events, savedTickets, assignedTickets, flaggedTaskIds }
 }
 
 test("runOnce saves every fetched ticket before assigning one", async () => {
@@ -65,7 +79,7 @@ test("runOnce saves every fetched ticket before assigning one", async () => {
 
   assert.equal(await context.scheduler.runOnce(), undefined)
   assert.deepEqual(context.events, [
-    "getTickets", "syncTickets", "getReadyTickets", "assignTicket",
+    "acquire", "getTickets", "syncTickets", "getReadyTickets", "assignTicket", "release",
   ])
   assert.deepEqual(context.savedTickets, [readyTicket, retryTicket])
   assert.deepEqual(context.assignedTickets, [readyTicket])
@@ -97,6 +111,7 @@ test("runOnce trusts database ordering and accepts Retry as conceptually ready",
 
   await context.scheduler.runOnce()
   assert.deepEqual(context.assignedTickets, [retryTicket])
+  assert.ok(context.events.includes("countAttempts:2"))
   assert.equal(retryTicket.status, "Retry")
 })
 
@@ -128,6 +143,71 @@ for (const stage of ["getTickets", "syncTickets", "getReadyTickets", "assignTick
     }
 
     await assert.rejects(context.scheduler.runOnce(), (actual) => actual === error)
-    assert.equal(context.events.at(-1), `failed:${stage}`)
+    assert.deepEqual(context.events.slice(-2), [`failed:${stage}`, "release"])
   })
 }
+
+test("a held lock skips the entire pass", async () => {
+  const context = setup()
+  context.lock.tryAcquire = async () => { context.events.push("held"); return null }
+  await context.scheduler.runOnce()
+  assert.deepEqual(context.events, ["held"])
+})
+
+test("an exhausted Retry ticket is flagged using its Vikunja ID and is not assigned", async () => {
+  const context = setup()
+  context.database.getReadyTickets = async () => [retryTicket]
+  context.database.countAttempts = async () => 3
+  await context.scheduler.runOnce()
+  assert.deepEqual(context.assignedTickets, [])
+  assert.deepEqual(context.flaggedTaskIds, [retryTicket.vikunjaTaskId])
+  assert.deepEqual(context.events.slice(-2), [`moveToFlagged:${retryTicket.vikunjaTaskId}`, "release"])
+})
+
+test("a Retry ticket below the limit is assigned", async () => {
+  const context = setup()
+  context.database.getReadyTickets = async () => [retryTicket]
+  context.database.countAttempts = async () => 2
+  await context.scheduler.runOnce()
+  assert.deepEqual(context.assignedTickets, [retryTicket])
+})
+
+test("a Retry ticket above the limit is not assigned", async () => {
+  const context = setup()
+  context.database.getReadyTickets = async () => [retryTicket]
+  context.database.countAttempts = async () => 4
+  await context.scheduler.runOnce()
+  assert.deepEqual(context.assignedTickets, [])
+  assert.deepEqual(context.flaggedTaskIds, [retryTicket.vikunjaTaskId])
+})
+
+test("a failed flag move stops the pass without assigning and releases the lock", async () => {
+  const context = setup()
+  context.database.getReadyTickets = async () => [retryTicket]
+  context.database.countAttempts = async () => 3
+  context.vikunja.moveToFlagged = async () => { throw new Error("move failed") }
+  await assert.rejects(context.scheduler.runOnce(), /move failed/)
+  assert.deepEqual(context.assignedTickets, [])
+  assert.equal(context.events.at(-1), "release")
+})
+
+test("a failed attempt count stops the pass and releases the lock", async () => {
+  const context = setup()
+  context.database.getReadyTickets = async () => [retryTicket]
+  context.database.countAttempts = async () => { throw new Error("count unavailable") }
+  await assert.rejects(context.scheduler.runOnce(), /count unavailable/)
+  assert.deepEqual(context.assignedTickets, [])
+  assert.equal(context.events.at(-1), "release")
+})
+
+test("both pass and release errors remain visible", async () => {
+  const context = setup()
+  context.vikunja.getTickets = async () => { throw new Error("board unavailable") }
+  context.lock.release = async () => { throw new Error("release failed") }
+  await assert.rejects(context.scheduler.runOnce(), (error: unknown) => {
+    assert.ok(error instanceof AggregateError)
+    assert.match(String(error.errors[0]), /board unavailable/)
+    assert.match(String(error.errors[1]), /release failed/)
+    return true
+  })
+})

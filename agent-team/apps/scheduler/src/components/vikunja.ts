@@ -1,4 +1,4 @@
-// Reads tickets from one existing Vikunja Kanban board.
+// Reads tickets and flags exhausted retries on one existing Vikunja Kanban board.
 import type { VikunjaInterface, VikunjaTicket } from "../interfaces/vikunja.interface.js"
 
 export interface VikunjaOptions {
@@ -57,7 +57,7 @@ function readBuckets(value: unknown): KanbanBucket[] {
   })
 }
 
-// Reads board tickets; a separate resource manager handles card movement.
+// Reads board tickets and moves exhausted retries to Flagged tickets.
 export class Vikunja implements VikunjaInterface {
   private readonly baseUrl: string
   private readonly perPage: number
@@ -133,6 +133,40 @@ export class Vikunja implements VikunjaInterface {
       }
 
       page += 1
+    }
+  }
+
+  async moveToFlagged(vikunjaTaskId: number): Promise<void> {
+    if (!isPositiveInteger(vikunjaTaskId)) {
+      throw new Error("Vikunja task ID must be a positive safe integer")
+    }
+
+    // The first page includes all columns, including empty ones.
+    const buckets = await this.getPage(1)
+    const destinations = buckets.filter((bucket) => bucket.title === "Flagged tickets")
+    if (destinations.length !== 1) {
+      throw new Error('Vikunja board must have exactly one "Flagged tickets" column')
+    }
+
+    const bucketId = destinations[0].id
+    const path = `/api/v1/projects/${this.options.projectId}/views/${this.options.viewId}/buckets/${bucketId}/tasks`
+    const response = await this.fetchRequest(`${this.baseUrl}${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.options.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        task_id: vikunjaTaskId,
+        bucket_id: bucketId,
+        project_view_id: this.options.viewId,
+        project_id: this.options.projectId,
+      }),
+      signal: AbortSignal.timeout(this.timeoutMs),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Vikunja POST ${path} returned HTTP ${response.status}`)
     }
   }
 

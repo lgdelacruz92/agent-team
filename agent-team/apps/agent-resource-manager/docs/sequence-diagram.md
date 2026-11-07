@@ -127,4 +127,4 @@ These are discussed topics, not necessarily new questions for the user. Work thr
 
 No undiscussed topics are currently listed.
 
-See the [proposal](proposal.md), [flowchart](flowchart.md), and [session context](session-context.md) for background. The [Ticket Scheduler change handoff](../../scheduler/docs/retry-limit-handoff.md) describes the agreed responsibility split.
+See the [proposal](proposal.md), [flowchart](flowchart.md), and [session context](session-context.md) for background. The Ticket Scheduler's [shared data reference](../../scheduler/docs/shared-data.md) records the agreed responsibility split and retry rules.

@@ -4,6 +4,7 @@ import { test } from "node:test"
 import { AgentManager } from "../src/components/agent-manager.js"
 import { Scheduler } from "../src/components/scheduler.js"
 import { SchedulerDatabase } from "../src/components/scheduler-database.js"
+import { SharedLock } from "../src/components/shared-lock.js"
 import { AgentStore } from "../src/db/agent-store.js"
 import { AssignmentStore } from "../src/db/assignment-store.js"
 import { createTestDatabase } from "./fixtures/database.js"
@@ -94,7 +95,8 @@ test("a failed board fetch leaves presence unchanged and skips assignment", asyn
     const before = tickets.list()
     const scheduler = new Scheduler({
       async getTickets() { throw new Error("board unavailable") },
-    }, schedulerDatabase, new AgentManager(schedulerDatabase, agents, assignments))
+      async moveToFlagged() { assert.fail("no move expected") },
+    }, schedulerDatabase, new AgentManager(schedulerDatabase, agents, assignments), new SharedLock(database), 3)
 
     await assert.rejects(scheduler.runOnce(), /board unavailable/)
     assert.deepEqual(tickets.list(), before)
@@ -115,7 +117,8 @@ test("a successful fetch missing a previously ready ticket cannot assign it", as
     await schedulerDatabase.syncTickets([first])
     const scheduler = new Scheduler({
       async getTickets() { return [] },
-    }, schedulerDatabase, new AgentManager(schedulerDatabase, agents, assignments))
+      async moveToFlagged() { assert.fail("no move expected") },
+    }, schedulerDatabase, new AgentManager(schedulerDatabase, agents, assignments), new SharedLock(database), 3)
     await scheduler.runOnce()
     assert.equal(tickets.getByVikunjaTaskId(first.vikunjaTaskId)?.presentOnBoard, false)
     assert.deepEqual(assignments.list(), [])
@@ -161,6 +164,34 @@ test("getReadyTickets skips incomplete assignments and allows completed history"
     assert.deepEqual(await scheduler.getReadyTickets(), [firstTicket, secondTicket])
     assignments.update(completed.id, { ...completed, completedAt: null })
     assert.deepEqual(await scheduler.getReadyTickets(), [firstTicket])
+  } finally {
+    database.close()
+  }
+})
+
+test("countAttempts counts recorded requests across the ticket's assignments only", async () => {
+  const database = createTestDatabase()
+  try {
+    const scheduler = new SchedulerDatabase(database)
+    const tickets = new TicketStore(database)
+    const agent = new AgentStore(database).create({ name: "agent", status: "idle" })
+    const assignments = new AssignmentStore(database)
+    const ticket = tickets.create({ ...first, presentOnBoard: true })
+    const other = tickets.create({ ...second, presentOnBoard: true })
+    const one = assignments.create({ ticketId: ticket.id, agentId: agent.id, status: "failed" })
+    const two = assignments.create({ ticketId: ticket.id, agentId: agent.id, status: "assigned" })
+    const otherAssignment = assignments.create({ ticketId: other.id, agentId: agent.id, status: "failed" })
+    const insert = database.prepare(`
+      INSERT INTO executions (assignment_id, status, created_at, work_requested_at)
+      VALUES (?, 'failed', '2026-01-01', ?)
+    `)
+    insert.run(one.id, "2026-01-01")
+    insert.run(one.id, null)
+    insert.run(two.id, "2026-01-02")
+    insert.run(otherAssignment.id, "2026-01-03")
+    assert.equal(await scheduler.countAttempts(ticket.id), 2)
+    assert.equal(await scheduler.countAttempts(other.id), 1)
+    assert.equal(await scheduler.countAttempts(999), 0)
   } finally {
     database.close()
   }
