@@ -6,10 +6,10 @@ import type { SchedulerDatabaseInterface, SchedulerTicket } from "../interfaces/
 export class SchedulerDatabase implements Pick<SchedulerDatabaseInterface, "getReadyTickets"> {
   constructor(private readonly tickets: TicketStore) {}
 
-  // For now, a ticket is ready when its local status is exactly "Ready".
+  // Ready and Retry tickets are both schedulable; their stored statuses stay unchanged.
   async getReadyTickets(): Promise<SchedulerTicket[]> {
     const tickets = this.tickets.list()
 
-    return tickets.filter((ticket) => ticket.status === "Ready")
+    return tickets.filter((ticket) => ticket.status === "Ready" || ticket.status === "Retry")
   }
 }

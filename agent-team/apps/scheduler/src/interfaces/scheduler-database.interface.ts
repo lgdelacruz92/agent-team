@@ -28,7 +28,7 @@ export interface SchedulerDatabaseInterface {
   // Insert a ticket or update the existing one with the same Vikunja task ID, preserving its local ID.
   saveTicket(ticket: VikunjaTicket): Promise<SchedulerTicket>
 
-  // Return tickets considered ready; ordering and readiness rules are not defined yet.
+  // Return Ready and Retry tickets in local ID order, preserving their stored statuses.
   getReadyTickets(): Promise<SchedulerTicket[]>
 
   // Create the assignment and update the local ticket together; both changes succeed or neither does.

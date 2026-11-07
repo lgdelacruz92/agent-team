@@ -9,7 +9,7 @@ export interface VikunjaTicket {
 }
 
 export interface VikunjaInterface {
-  // Fetch tickets for the scheduler to sync into its database.
+  // Fetch every card from the configured Kanban board; column titles are ticket statuses.
   getTickets(): Promise<VikunjaTicket[]>
 
   // Mark the Vikunja task in progress after its local assignment is confirmed.

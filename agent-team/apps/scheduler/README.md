@@ -1,8 +1,8 @@
 # Scheduler v2 scaffold
 
-Estimated reading time: 2 minutes (150 WPM)
+Estimated reading time: 3 minutes (150 WPM)
 
-Standalone TypeScript Express app with SQLite persistence. No scheduling, worker dispatch, or Vikunja integration yet. The existing `frontend-ctr` stays separate.
+Standalone TypeScript Express app with SQLite persistence and a Kanban ticket-fetching component. No scheduling or worker dispatch yet. The existing `frontend-ctr` stays separate.
 
 ## Run
 
@@ -46,6 +46,29 @@ npm run typecheck
 npm run build
 npm start
 ```
+
+## Kanban ticket fetching
+
+`src/components/vikunja.ts` reads one existing Kanban board. Supply connection settings explicitly; the HTTP scaffold does not call this component yet.
+
+```ts
+import { Vikunja } from "./src/components/vikunja.js"
+
+const vikunja = new Vikunja({
+  baseUrl: "https://your-vikunja-server", // Server URL, without /api/v1.
+  token: process.env.VIKUNJA_API_TOKEN ?? "",
+  projectId: 3, // Replace with your project's ID.
+  viewId: 12, // Replace with your Kanban view's ID.
+})
+
+const tickets = await vikunja.getTickets()
+```
+
+Each result contains `vikunjaTaskId`, `title`, `status`, and `priority`. Column titles become statuses exactly as written: `Ready`, `In progress`, `Retry`, and `Done`. All columns are fetched; `SchedulerDatabase.getReadyTickets()` separately selects `Ready` and `Retry`.
+
+Pagination uses each column's `count`, not the outer pagination header. Empty columns may contain `tasks: null`. Duplicate task IDs are returned once. Failed requests, invalid data, and stalled pagination throw rather than returning partial results. Multiple requests are not an atomic board snapshot; cards can move while pages are fetched.
+
+Optional `perPage` defaults to 50; `timeoutMs` defaults to 30,000 milliseconds per request. Tests inject a fake `fetch` as the constructor's second argument. No database writes or card moves happen here; `markInProgress()` is not implemented.
 
 ## Table stores
 
