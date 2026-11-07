@@ -1,6 +1,6 @@
 # Scheduler session context
 
-Estimated reading time: 7 minutes (150 WPM)
+Estimated reading time: 9 minutes (150 WPM)
 
 ## Purpose
 
@@ -12,8 +12,8 @@ The user also hopes the scheduling system can serve as a blueprint for many appl
 
 - `scheduler/` is a standalone TypeScript and Express scaffold with SQLite persistence.
 - It has generic state endpoints, domain stores for tickets, agents and assignments, and interfaces for future components.
-- Scheduling and worker dispatch are not implemented yet. Vikunja Kanban fetching is implemented as a standalone component, not wired into the app. `frontend-ctr` remains separate.
-- The SQLite stores and HTTP scaffold are implemented. Component implementation has started, but the scheduler workflow, ticket sync, and card moves remain unfinished.
+- `Scheduler.runOnce()` orchestration and Vikunja Kanban fetching are implemented as standalone components, not wired into the app. Worker dispatch is not implemented. `frontend-ctr` remains separate.
+- The SQLite stores and HTTP scaffold are implemented. `saveTicket`, `createAssignment`, Agent Manager, and `markInProgress` implementations remain unfinished; `runOnce` trusts their interfaces.
 - The user prefers to start with the scheduler database, thinking about the data before the scheduling workflow.
 - The first implemented method is `SchedulerDatabaseInterface.getReadyTickets`. The user initially deferred `VikunjaInterface`, then asked to implement Vikunja tickets next.
 - The ready-ticket lookup selects local tickets whose status is exactly `Ready` or `Retry`, in local ID order, without changing their stored statuses. Both statuses are conceptually ready to schedule. Dependency and priority rules are not implemented.
@@ -65,4 +65,15 @@ The user then added the project goal and requested another commit.
 - Authentication uses a bearer token. HTTP errors omit response bodies and credentials. Network, timeout, JSON, and validation failures reject the operation rather than returning partial results. Pagination is not an atomic snapshot of a changing board.
 - Added `test/vikunja.test.ts` and README usage instructions. All 22 tests passed; application typecheck, build, and a separate typecheck of the new test file passed. Tests use fake responses; no live board request was made.
 - The component is not wired into the Express scaffold. Next work can implement local ticket sync or card movement when requested.
-- The user requested committing the session's scheduler changes: Kanban fetching, conceptual readiness for Retry tickets, tests, interfaces, and documentation.
+- The user requested committing the session's scheduler changes: Kanban fetching, conceptual readiness for Retry tickets, tests, interfaces, and documentation. Committed as `903208c`.
+
+## Scheduler runOnce implementation
+
+- The user requested only `SchedulerInterface.runOnce()`, explicitly instructing us to trust the dependency interfaces and not implement anything outside that interface.
+- Added `src/components/scheduler.ts`. Its constructor receives `VikunjaInterface`, `SchedulerDatabaseInterface`, and `AgentManagerInterface`; its only workflow method is `runOnce`.
+- One pass awaits ticket fetching, saves each fetched ticket sequentially, asks the database for ready tickets, and attempts to assign only the first returned ticket. Selection trusts database readiness and ordering; no new priority policy is introduced.
+- No ready ticket or a null assignment ends the pass. No internal polling, retry loop, or attempt to assign another ticket. A later call can retry.
+- Agent Manager owns assignment persistence and the local ticket update. After it returns an assignment, the scheduler awaits `markInProgress` using the Vikunja task ID, not the local ticket ID.
+- Errors propagate and stop the pass. No rollback, recovery policy, additional dependency implementation, or application wiring was added.
+- Added `test/scheduler.test.ts` with interface doubles, covering call order, one-ticket selection, Retry eligibility, empty cases, and failures at each dependency step. All 32 tests and application/new-test-file typechecks passed.
+- The user requested committing the runOnce implementation, its tests, and these session notes.
