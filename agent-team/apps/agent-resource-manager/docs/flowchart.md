@@ -12,7 +12,7 @@ flowchart LR
     S -->|"sync tickets + record assignment"| DB[("Shared SQLite")]
     DB -->|"read incomplete assignments"| RM["Resource manager<br/>(proposed)"]
     RM -->|"start and observe work"| A["Real agent"]
-    A -->|"actual state + outcome"| RM
+    A -->|"observed state"| RM
     RM -->|"report agent + assignment state"| DB
     RM -->|"move and check cards"| V
 ```
@@ -24,22 +24,26 @@ SQLite is the shared job board. An assignment reserves work; it does not prove t
 ```mermaid
 flowchart TD
     Start["Read an incomplete assignment"] --> Check{"Can we establish<br/>what the agent is doing?"}
-    Check -->|"unknown"| Human["Keep reservation;<br/>investigate or alert human"]
+    Check -->|"unknown"| Investigate["Reconcile startup and status<br/>details undecided"]
     Check -->|"already running or finished"| Observe["Observe real agent state"]
     Check -->|"not started; safe to start"| Launch["Request work"]
     Launch --> Confirm{"Startup confirmed?"}
-    Confirm -->|"uncertain or failed"| Human
+    Confirm -->|"uncertain"| Investigate
     Confirm -->|"yes"| Report["Report observed progress;<br/>move card to In progress"]
     Report --> Move{"Card move succeeded?"}
     Move -->|"no"| Retry["Surface failure and reconcile move;<br/>do not assume agent stopped"]
     Retry --> Observe
     Move -->|"yes"| Observe
-    Observe --> Finished{"Work finished?"}
-    Finished -->|"no"| Later["Check again later"]
+    Observe --> Finished{"Agent state?"}
+    Finished -->|"busy within time limit"| Later["Check again later"]
     Later --> Observe
-    Finished -->|"yes"| Coordinate["Coordinate final card and DB state;<br/>confirm agent is available"]
+    Finished -->|"idle and ready"| Success["Mark succeeded<br/>move card to Done"]
+    Finished -->|"too slow or unreachable"| Fail["Mark failed and try to stop session<br/>move card to Retry"]
+    Success --> Coordinate["Coordinate final card and DB state"]
+    Fail --> Coordinate
     Coordinate --> Safe{"Completion protocol<br/>satisfied?"}
     Safe -->|"no or unknown"| Human
+    Human["Keep reservation for coordination issue;<br/>investigate or alert human"]
     Safe -->|"yes"| Complete["Record completion;<br/>report actual agent state"]
 ```
 

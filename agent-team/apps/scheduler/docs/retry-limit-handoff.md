@@ -12,6 +12,7 @@ Give a future agent the requested change to the separate Ticket Scheduler app in
 - Before assigning an eligible `Retry` ticket again, the Ticket Scheduler checks its attempt count. The first attempt counts as **1** toward the limit.
 - If the limit is reached, the Ticket Scheduler must not create another assignment. It moves the card from `Retry` to the new Vikunja `Flagged tickets` column for human intervention.
 - If the ticket is below the limit, the Ticket Scheduler may assign it subject to its existing eligibility and reservation checks.
+- If the previous agent is unreachable, the Resource Manager flags it for human review and marks it unavailable; the Ticket Scheduler should use another available agent for an eligible retry.
 - The user suggested counting attempts from a future shared `executions` table. That table and its schema do not exist yet; how attempts are identified and counted needs a shared contract.
 
 For example, if the eventual limit is 3, the first run is attempt 1. After three qualifying attempts reach the limit, the Ticket Scheduler flags the ticket instead of assigning attempt 4. The actual limit is not yet decided.
@@ -31,12 +32,14 @@ For example, if the eventual limit is 3, the first run is attempt 1. After three
 4. Preserve incomplete-assignment reservations. Coordinate with the Resource Manager's completion protocol and overlapping board fetches; moving a card and updating SQLite are not one atomic operation. Do not assume this ownership split by itself resolves stale-fetch or concurrent-assignment races.
 5. Add tests for first-attempt counting, below and at the limit, no extra assignment at the limit, flagged tickets staying ineligible, move failures, unavailable attempt data, existing reservations, and relevant concurrency or stale-fetch cases. Use controlled dependencies; do not start real agents or change live infrastructure without authorization.
 
+The user prefers a shared database lock for this proof of concept, with potentially stale locks flagged for a human rather than automatically cleared. The lock protocol, warning threshold, and recovery procedure still need agreement. The current database is SQLite; migrating to a different database is separate future work.
+
 ## Open questions
 
 - What is the attempt limit, and where is it configured?
 - What exactly constitutes a qualifying attempt, especially after an uncertain start or a human intervention? Does a human reset or otherwise change the count?
 - What is the shared `executions` schema, and how is it migrated and kept consistent with assignment outcomes?
-- What should happen when stopping uncertain work cannot be confirmed? Do not assume a stop request proves the agent stopped or that its reservation can be released.
+- The user accepts a retry after the Resource Manager decides an attempt failed even if stopping the old session cannot be confirmed. How should this interact with assignment release and the attempt limit? A stop request does not prove the old session stopped.
 - How should failed card moves be retried or surfaced, and what happens if a card is moved manually during the check?
 - What protocol prevents duplicate scheduling when a board fetch overlaps a card move or assignment completion?
 
