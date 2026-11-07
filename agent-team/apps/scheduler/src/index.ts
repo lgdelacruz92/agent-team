@@ -4,6 +4,7 @@ import { AgentManager } from "./components/agent-manager.js"
 import { AssignmentMonitor } from "./components/assignment-monitor.js"
 import { Scheduler } from "./components/scheduler.js"
 import { SchedulerDatabase } from "./components/scheduler-database.js"
+import { SchedulerStatus } from "./components/scheduler-status.js"
 import { Vikunja } from "./components/vikunja.js"
 import { config } from "./config.js"
 import { openDatabase } from "./db/database.js"
@@ -22,12 +23,13 @@ const assignments = new AssignmentStore(database)
 const agentManager = new AgentManager(schedulerDatabase, new AgentStore(database), assignments)
 const assignmentMonitor = new AssignmentMonitor(assignments, config.assignmentWarningMs)
 const scheduler = new Scheduler(vikunja, schedulerDatabase, agentManager)
+const status = new SchedulerStatus(scheduler)
 
 const schedulingController = new AbortController()
 let scheduling: Promise<void> = Promise.resolve()
-const server = createApp().listen(config.port, config.host, () => {
+const server = createApp(status).listen(config.port, config.host, () => {
   console.log(`scheduler listening on http://${config.host}:${config.port}`)
-  scheduling = runSchedulerLoop(scheduler, config.pollMs, schedulingController.signal, undefined, () => assignmentMonitor.check()).catch((error) => {
+  scheduling = runSchedulerLoop(status, config.pollMs, schedulingController.signal, undefined, () => assignmentMonitor.check()).catch((error) => {
     console.error("scheduler loop failed:", error)
     process.exitCode = 1
     shutdown()

@@ -36,6 +36,9 @@ The database directory and domain tables are created automatically. Database fil
 ## Endpoints
 
 - `GET /health`: liveness check.
+- `GET /status`: scheduling pass status. Returns `running`, `lastSucceededAt`, `lastFailedAt`, and `lastResult` (`success`, `failure`, or `null`). Times are UTC ISO strings; timestamps and result are `null` until the corresponding event occurs. While a pass is running, `lastResult` describes the previous completed pass.
+
+`/status` returns HTTP 200 even when the last pass failed; inspect the fields and logs to assess progress. A successful pass may find no tickets or available agents, and assignment warning-check failures are logged separately. Status is held in memory and resets when the app restarts. `/health` remains a process-liveness check, not a scheduler or watcher health check.
 
 ## Checks
 

@@ -3,6 +3,7 @@ import assert from "node:assert/strict"
 import { setImmediate } from "node:timers/promises"
 import { test } from "node:test"
 import { runSchedulerLoop } from "../src/scheduler-loop.js"
+import { SchedulerStatus } from "../src/components/scheduler-status.js"
 
 // Let breakpoint pauses take as long as needed; normal test runs keep their timeout.
 const testTimeout = process.env.SCHEDULER_TEST_DEBUG === "1" ? undefined : 2000
@@ -114,4 +115,28 @@ test("a failed assignment check is reported but does not stop scheduling", async
   }, 1, controller.signal, undefined, () => { throw failure }, (error) => errors.push(error))
   assert.equal(passes, 1)
   assert.deepEqual(errors, [failure])
+})
+
+test("the loop exposes a failed pass followed by recovery", async () => {
+  const controller = new AbortController()
+  const failure = new Error("board unavailable")
+  let passes = 0
+  let observedFailure = false
+  const tracked = new SchedulerStatus({
+    async runOnce() {
+      passes += 1
+      if (passes === 1) throw failure
+      controller.abort()
+    },
+  })
+  await runSchedulerLoop(tracked, 1, controller.signal, (error) => {
+    assert.equal(error, failure)
+    assert.equal(tracked.snapshot().lastResult, "failure")
+    assert.equal(tracked.snapshot().running, false)
+    observedFailure = true
+  })
+  assert.equal(observedFailure, true)
+  assert.equal(tracked.snapshot().lastResult, "success")
+  assert.ok(tracked.snapshot().lastSucceededAt)
+  assert.ok(tracked.snapshot().lastFailedAt)
 })

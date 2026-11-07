@@ -109,6 +109,13 @@ for (const hasAgent of [false, true]) {
 
     const response = await fetch(`http://127.0.0.1:${port}/health`)
     assert.deepEqual(await response.json(), { ok: true, service: "scheduler" })
+    const status = await (await fetch(`http://127.0.0.1:${port}/status`)).json() as {
+      running: boolean, lastSucceededAt: string | null, lastFailedAt: string | null, lastResult: string | null,
+    }
+    assert.equal(typeof status.running, "boolean")
+    assert.ok(status.lastSucceededAt && Number.isFinite(Date.parse(status.lastSucceededAt)))
+    assert.equal(status.lastFailedAt, null)
+    assert.equal(status.lastResult, "success")
     child.kill("SIGTERM")
     const [code, signal] = await exited
     assert.equal(code, 0)
