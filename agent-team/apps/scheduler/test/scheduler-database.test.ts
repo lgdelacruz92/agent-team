@@ -10,7 +10,7 @@ test("saveTicket creates a local ticket with every supplied field", async () => 
 
   try {
     const tickets = new TicketStore(database)
-    const schedulerDatabase = new SchedulerDatabase(tickets)
+    const schedulerDatabase = new SchedulerDatabase(database)
     const input = { vikunjaTaskId: 42, title: "Build a form", status: "Retry", priority: 3 }
 
     const saved = await schedulerDatabase.saveTicket(input)
@@ -30,7 +30,7 @@ test("saveTicket updates by Vikunja ID, preserving the local ID and other ticket
 
   try {
     const tickets = new TicketStore(database)
-    const schedulerDatabase = new SchedulerDatabase(tickets)
+    const schedulerDatabase = new SchedulerDatabase(database)
     const other = tickets.create({ vikunjaTaskId: 41, title: "Other", status: "Ready", priority: 1 })
     const existing = tickets.create({ vikunjaTaskId: 42, title: "Old title", status: "Retry", priority: 2 })
     const input = { vikunjaTaskId: 42, title: "New title", status: "In progress", priority: 5 }
@@ -50,7 +50,7 @@ test("saveTicket repeatedly saves the same task without creating duplicates", as
 
   try {
     const tickets = new TicketStore(database)
-    const schedulerDatabase = new SchedulerDatabase(tickets)
+    const schedulerDatabase = new SchedulerDatabase(database)
     const input = { vikunjaTaskId: 42, title: "Build a form", status: "Done", priority: 0 }
 
     const first = await schedulerDatabase.saveTicket(input)
@@ -67,7 +67,7 @@ test("saveTicket repeatedly saves the same task without creating duplicates", as
 
 test("saveTicket rejects database failures rather than reporting success", async () => {
   const database = openDatabase(":memory:")
-  const schedulerDatabase = new SchedulerDatabase(new TicketStore(database))
+  const schedulerDatabase = new SchedulerDatabase(database)
   database.close()
 
   await assert.rejects(schedulerDatabase.saveTicket({
@@ -80,7 +80,7 @@ test("getReadyTickets returns an empty list when no tickets are ready", async ()
 
   try {
     const tickets = new TicketStore(database)
-    const schedulerDatabase = new SchedulerDatabase(tickets)
+    const schedulerDatabase = new SchedulerDatabase(database)
 
     assert.deepEqual(await schedulerDatabase.getReadyTickets(), [])
 
@@ -96,7 +96,7 @@ test("getReadyTickets returns Ready and Retry tickets in local ID order without 
 
   try {
     const tickets = new TicketStore(database)
-    const schedulerDatabase = new SchedulerDatabase(tickets)
+    const schedulerDatabase = new SchedulerDatabase(database)
 
     const first = tickets.create({ vikunjaTaskId: 10, title: "First", status: "Ready", priority: 1 })
     tickets.create({ vikunjaTaskId: 11, title: "Under review", status: "Review", priority: 2 })

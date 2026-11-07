@@ -7,7 +7,8 @@ import { Vikunja } from "./components/vikunja.js"
 import { config } from "./config.js"
 import { openDatabase } from "./db/database.js"
 import { StateStore } from "./db/state-store.js"
-import { TicketStore } from "./db/ticket-store.js"
+import { AgentStore } from "./db/agent-store.js"
+import { AssignmentStore } from "./db/assignment-store.js"
 import { runSchedulerLoop } from "./scheduler-loop.js"
 
 if (!config.vikunja.baseUrl) {
@@ -16,8 +17,8 @@ if (!config.vikunja.baseUrl) {
 
 const vikunja = new Vikunja(config.vikunja)
 const database = openDatabase(config.databasePath)
-const schedulerDatabase = new SchedulerDatabase(new TicketStore(database))
-const agentManager = new AgentManager(schedulerDatabase)
+const schedulerDatabase = new SchedulerDatabase(database)
+const agentManager = new AgentManager(schedulerDatabase, new AgentStore(database), new AssignmentStore(database))
 const scheduler = new Scheduler(vikunja, schedulerDatabase, agentManager)
 const store = new StateStore(config.databasePath)
 

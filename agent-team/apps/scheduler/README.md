@@ -1,8 +1,8 @@
 # Scheduler v2 scaffold
 
-Estimated reading time: 5 minutes (150 WPM)
+Estimated reading time: 7 minutes (150 WPM)
 
-Standalone TypeScript Express app with SQLite persistence and Kanban ticket fetching. `index.ts` runs `Scheduler.runOnce()` continuously; unfinished dependency methods throw explicit errors. No working assignment or worker dispatch yet. The existing `frontend-ctr` stays separate.
+Standalone TypeScript Express app with SQLite persistence, local agent assignment, and Vikunja Kanban card movement. `index.ts` runs `Scheduler.runOnce()` continuously. Assignment reserves a local agent; it does not start an OpenCode session. Worker dispatch and completion handling are not implemented. The existing `frontend-ctr` stays separate.
 
 ## Run
 
@@ -62,7 +62,9 @@ SIGINT or SIGTERM stops the loop and cancels its polling wait. An active pass fi
 
 `SchedulerDatabase.saveTicket()` creates or updates each fetched ticket by its Vikunja task ID, preserving its local ID and copying title, status, and priority exactly. Repeated saves do not create duplicates. Tickets absent from a fetch are not deleted.
 
-`createAssignment`, `assignTicket`, and `markInProgress` remain throwing placeholders. With a local Ready or Retry ticket, the pass now fails at `assignTicket` after saving fetched cards; no real assignment or dispatch occurs. Missing or invalid connection settings prevent startup.
+`AgentManager.assignTicket()` chooses the first idle agent in local ID order with no incomplete assignment. `SchedulerDatabase.createAssignment()` records ownership, updates the local ticket, and marks the agent busy in one SQLite transaction. The scheduler then calls `Vikunja.markInProgress()`. No agent available means no assignment and no card movement. Missing or invalid connection settings prevent startup.
+
+If card movement fails, the next pass reuses the ticket's existing incomplete assignment and retries the move instead of reserving another agent. A board refresh can temporarily reset the local ticket to Ready or Retry; it never clears the reservation. A successful later board fetch synchronizes its status.
 
 For direct use, supply connection settings explicitly:
 
@@ -83,7 +85,35 @@ Each result contains `vikunjaTaskId`, `title`, `status`, and `priority`. Column 
 
 Pagination uses each column's `count`, not the outer pagination header. Empty columns may contain `tasks: null`. Duplicate task IDs are returned once. Failed requests, invalid data, and stalled pagination throw rather than returning partial results. Multiple requests are not an atomic board snapshot; cards can move while pages are fetched.
 
-Optional `perPage` defaults to 50; `timeoutMs` defaults to 30,000 milliseconds per request. Tests inject a fake `fetch` as the constructor's second argument. No database writes or card moves happen here; `markInProgress()` is not implemented.
+Optional `perPage` defaults to 50; `timeoutMs` defaults to 30,000 milliseconds per request. Tests inject a fake `fetch` as the constructor's second argument. `getTickets()` does not write to either system.
+
+`markInProgress()` reads the first board page to find exactly one column titled `In progress`, then posts the task to that bucket in the configured project/view. Column discovery does not need every card page. Missing, differently capitalized, duplicate, or malformed destinations fail before the write. HTTP, network, and timeout failures propagate; HTTP errors omit response bodies and credentials. Each call resolves the column ID again.
+
+## Local agents and assignments
+
+Agents must be registered explicitly in the domain database. Startup does not create agents, probe OpenCode servers, or load a worker list. A fresh database therefore keeps polling without assigning anything. The generic `/state` endpoints do not register agents.
+
+Register a local agent once through `AgentStore`, for example:
+
+```ts
+const database = openDatabase("data/scheduler.sqlite")
+try {
+  new AgentStore(database).create({ name: "frontend-1", status: "idle" })
+} finally {
+  database.close()
+}
+```
+
+Use the imports shown below. The name identifies a local record, not an OpenCode endpoint. Do not run registration every pass; agent names are not unique.
+
+- `idle`: eligible, provided the agent has no assignment whose `completedAt` is null.
+- `busy`: reserved by assignment creation. Other status strings are excluded.
+- Assignment `running`: bookkeeping for active ownership, not proof that an AI worker is executing.
+- Completion: still manual through the stores. Set the assignment's completion timestamp and return the agent to idle only when its work is actually finished. Moving the board card to Done alone does not release the reservation.
+
+`SchedulerDatabase` now receives the shared SQLite connection and constructs its own stores. `AgentManager` receives the scheduler database, AgentStore, and AssignmentStore on that same connection. Transactions recheck persisted ticket readiness and agent availability and reject duplicate active ownership. Raw stores remain low-level CRUD and can bypass these scheduling rules.
+
+The SQLite transaction cannot include the external Vikunja request. Local ownership remains saved if the move fails; the polling loop logs the failure and retries later. Persistent movement failures can stall the first ready ticket. Recovery/backoff, worker dispatch, and completion monitoring remain future work.
 
 ## Table stores
 

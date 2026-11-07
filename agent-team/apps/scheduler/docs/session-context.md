@@ -1,6 +1,6 @@
 # Scheduler session context
 
-Estimated reading time: 15 minutes (150 WPM)
+Estimated reading time: 17 minutes (150 WPM)
 
 ## Purpose
 
@@ -13,7 +13,8 @@ The user also hopes the scheduling system can serve as a blueprint for many appl
 - `scheduler/` is a standalone TypeScript and Express scaffold with SQLite persistence.
 - It has generic state endpoints, domain stores for tickets, agents and assignments, and interfaces for future components.
 - `Scheduler.runOnce()` orchestration and Vikunja Kanban fetching are implemented. `index.ts` constructs the components and starts a non-overlapping scheduling loop after the HTTP server starts. Worker dispatch is not implemented. `frontend-ctr` remains separate.
-- The SQLite stores, HTTP scaffold, and `SchedulerDatabase.saveTicket` are implemented. `createAssignment`, `AgentManager.assignTicket`, and `markInProgress` remain explicit throwing placeholders; assignment and card movement are unfinished.
+- The SQLite stores, HTTP scaffold, ticket sync, assignment creation, local agent selection, and `Vikunja.markInProgress` are implemented. No throwing placeholders remain. Local assignment reserves an agent; OpenCode session dispatch and completion/release handling remain unfinished.
+- Agent selection uses exact status `idle` and no assignment with null `completedAt`, in local agent ID order. Assignment creation marks the agent `busy`, updates the ticket, and saves ownership atomically. Agents must be registered explicitly through AgentStore; startup does not seed agents or discover OpenCode workers.
 - The user prefers to start with the scheduler database, thinking about the data before the scheduling workflow.
 - The first implemented method is `SchedulerDatabaseInterface.getReadyTickets`. The user initially deferred `VikunjaInterface`, then asked to implement Vikunja tickets next.
 - The ready-ticket lookup selects local tickets whose status is exactly `Ready` or `Retry`, in local ID order, without changing their stored statuses. Both statuses are conceptually ready to schedule. Dependency and priority rules are not implemented.
@@ -122,3 +123,15 @@ The user then added the project goal and requested another commit.
 - Assignment creation, agent assignment, and Vikunja movement remain throwing placeholders. A pass now saves fetched cards and, if Ready or Retry tickets exist, fails at `AgentManager.assignTicket`.
 - Added tests for creation, updates preserving local identity and unrelated tickets, repeated saves, and database failures. Updated placeholder and startup tests; the startup test verifies repeated passes persist one ticket across shutdown and create no assignments. All requests use a local fake board, not the user's server.
 - Verification: all 44 tests passed, application and changed-test-file typechecks passed, and build passed. README and current-state notes reflect ticket persistence.
+- The user requested committing ticket persistence; committed as `14b65db`.
+
+## Remaining method implementations
+
+- The user authorized implementing `SchedulerDatabase.createAssignment`, `AgentManager.assignTicket`, and `Vikunja.markInProgress`.
+- `SchedulerDatabase` now takes the shared SQLite connection and constructs its stores. `createAssignment` uses `BEGIN IMMEDIATE`, verifies the persisted ticket is Ready or Retry, checks the agent is idle with no incomplete assignment, and rejects existing active ticket ownership. Saves the assignment using supplied status/time, changes the local ticket status, and marks the agent busy. Every write commits together or rolls back; store CRUD remains unrestricted.
+- `AgentManager` receives the scheduler database plus AgentStore and AssignmentStore on the shared connection. Chooses the first eligible agent by local ID, returning null only when none is available. Records assignment status `running`, ticket status `In progress`, and the current UTC timestamp. Database failures propagate.
+- Incomplete assignments are identified by null `completedAt`, not by assignment status. Existing active ticket ownership is returned unchanged when retried, including after a board refresh or manager restart. This prevents duplicate assignment when local writes succeed but a Vikunja move fails. Board refresh may temporarily restore the local ticket to Ready/Retry; a later successful fetch synchronizes In progress.
+- `markInProgress` validates the Vikunja task ID, reads the first board page, requires exactly one column titled `In progress`, and posts the move to the scoped bucket endpoint. Uses bearer authentication and a per-request timeout; errors omit response bodies and tokens. Does not cache the bucket ID or guess one. Checked the upstream Vikunja TaskBucket model/router for the POST path and fields; the existing controller served only as reference.
+- Updated `index.ts` wiring. Startup does not invent agents or live connection settings. Registration is explicit through AgentStore. No OpenCode sessions are started; `running` is local ownership bookkeeping, not evidence of worker execution. Completion monitoring and releasing busy agents remain future work.
+- Replaced obsolete placeholder tests with assignment tests and added agent-manager and movement coverage. Tests cover successful claims, eligibility, duplicate prevention, completed history, write failures and rollback, HTTP/data/network errors, and local fake-board startup with no agents or a failed move followed by success. No request was made to the user's board.
+- Verification: all 68 tests passed, application and all-test-file typechecks passed, and build passed. README documents registration, statuses, transaction boundaries, retry behavior, and the remaining dispatch/completion work.

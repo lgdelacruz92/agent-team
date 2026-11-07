@@ -1,4 +1,4 @@
-// Checks Kanban ticket fetching without connecting to a real Vikunja server.
+// Checks Kanban ticket fetching and movement without connecting to a real Vikunja server.
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { Vikunja } from "../src/components/vikunja.js"
@@ -154,6 +154,101 @@ test("getTickets starts fresh on each call and supports a base URL path prefix",
   }
   const vikunja = new Vikunja({ ...options, baseUrl: "https://vikunja.example/vikunja/" }, request)
   assert.deepEqual(await vikunja.getTickets(), await vikunja.getTickets())
+})
+
+test("markInProgress discovers the exact column and sends the scoped authenticated move", async () => {
+  const calls: string[] = []
+  const request: typeof fetch = async (url, init) => {
+    calls.push(String(url))
+    assert.equal(new Headers(init?.headers).get("Authorization"), "Bearer test-token")
+    assert.ok(init?.signal instanceof AbortSignal)
+    if (init?.method !== "POST") {
+      return json([
+        { id: 1, title: "Ready", count: 100, tasks: null },
+        { id: 7, title: "In progress", count: 0, tasks: null },
+      ])
+    }
+    assert.equal(new Headers(init.headers).get("Content-Type"), "application/json")
+    assert.deepEqual(JSON.parse(String(init.body)), {
+      task_id: 42, bucket_id: 7, project_view_id: 12, project_id: 3,
+    })
+    // A successful move does not need a JSON response body.
+    return new Response(null, { status: 204 })
+  }
+  await new Vikunja({ ...options, baseUrl: "https://vikunja.example/prefix/" }, request).markInProgress(42)
+  assert.deepEqual(calls, [
+    "https://vikunja.example/prefix/api/v1/projects/3/views/12/tasks?page=1&per_page=50",
+    "https://vikunja.example/prefix/api/v1/projects/3/views/12/buckets/7/tasks",
+  ])
+})
+
+test("markInProgress rejects missing, renamed, and duplicate destination columns without writing", async () => {
+  for (const board of [[], [bucket(1, "In Progress", 1)], [bucket(1, "In progress", 1), bucket(2, "In progress", 2)]]) {
+    let calls = 0
+    const request: typeof fetch = async (_url, init) => {
+      calls += 1
+      assert.notEqual(init?.method, "POST")
+      return json(board)
+    }
+    await assert.rejects(new Vikunja(options, request).markInProgress(42), /exactly one "In progress" column/)
+    assert.equal(calls, 1)
+  }
+})
+
+test("markInProgress rejects invalid task IDs before making requests", async () => {
+  const request: typeof fetch = async () => { assert.fail("No request should be made") }
+  for (const id of [0, -1, 1.5, NaN, Number.MAX_SAFE_INTEGER + 1]) {
+    await assert.rejects(new Vikunja(options, request).markInProgress(id), /positive safe integer/)
+  }
+})
+
+test("markInProgress throws for lookup and move HTTP failures without exposing response bodies", async () => {
+  for (const method of ["GET", "POST"]) {
+    const request: typeof fetch = async (_url, init) => {
+      if (method === "GET" || init?.method === "POST") {
+        return new Response(options.token, { status: 500 })
+      }
+      return json([{ id: 7, title: "In progress", count: 0, tasks: null }])
+    }
+    await assert.rejects(new Vikunja(options, request).markInProgress(42), (error: Error) => {
+      assert.match(error.message, new RegExp(`Vikunja ${method} .*HTTP 500`))
+      assert.ok(!error.message.includes(options.token))
+      return true
+    })
+  }
+})
+
+test("markInProgress propagates network and timeout failures during movement", async () => {
+  for (const error of [new Error("Network unavailable"), new DOMException("Timed out", "TimeoutError")]) {
+    const request: typeof fetch = async (_url, init) => {
+      if (init?.method === "POST") {
+        throw error
+      }
+      return json([{ id: 7, title: "In progress", count: 0, tasks: null }])
+    }
+    await assert.rejects(new Vikunja(options, request).markInProgress(42), (actual) => actual === error)
+  }
+})
+
+test("markInProgress validates lookup data and refreshes the column ID on every call", async () => {
+  const invalidRequest: typeof fetch = async () => json({ buckets: [] })
+  await assert.rejects(new Vikunja(options, invalidRequest).markInProgress(42), /Kanban bucket array/)
+  const invalidJson: typeof fetch = async () => new Response("{invalid")
+  await assert.rejects(new Vikunja(options, invalidJson).markInProgress(42), SyntaxError)
+
+  let bucketId = 6
+  const request: typeof fetch = async (url, init) => {
+    if (init?.method !== "POST") {
+      bucketId += 1
+      return json([{ id: bucketId, title: "In progress", count: 0, tasks: null }])
+    }
+    assert.ok(String(url).endsWith(`/buckets/${bucketId}/tasks`))
+    return new Response(null, { status: 204 })
+  }
+  const vikunja = new Vikunja(options, request)
+  await vikunja.markInProgress(42)
+  await vikunja.markInProgress(42)
+  assert.equal(bucketId, 8)
 })
 
 test("Vikunja rejects missing credentials and invalid connection settings", () => {

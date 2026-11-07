@@ -31,6 +31,7 @@ export interface SchedulerDatabaseInterface {
   // Return Ready and Retry tickets in local ID order, preserving their stored statuses.
   getReadyTickets(): Promise<SchedulerTicket[]>
 
-  // Create the assignment and update the local ticket together; both changes succeed or neither does.
+  // Create the assignment, update the local ticket, and mark the idle agent busy atomically.
+  // Reject missing/non-ready tickets, unavailable agents, and duplicate active assignments.
   createAssignment(assignment: NewAssignment): Promise<Assignment>
 }
