@@ -143,4 +143,5 @@ The user then added the project goal and requested another commit.
 
 ## Agent status ownership
 
-- The user wants the future watcher, not the scheduler, to update `agents.status` to reflect real agents. Assignment creation leaves agent status unchanged; an incomplete assignment reserves an idle agent until completion. The existing assignment status `running` remains bookkeeping and does not confirm execution.
+- The user wants the future watcher, not the scheduler, to update `agents.status` to reflect real agents. Assignment creation leaves agent status unchanged; an incomplete assignment reserves an idle agent until completion.
+- The user requested new assignments start as `assigned`, not `running`. Existing records are unchanged and may still say `running` without confirming execution. The watcher is not implemented.

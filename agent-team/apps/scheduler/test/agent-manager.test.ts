@@ -36,7 +36,7 @@ test("assignTicket chooses the first idle agent, skipping offline, busy, and res
     assert.ok(saved)
     assert.equal(saved.ticketId, context.ticket.id)
     assert.equal(saved.agentId, firstFree.id)
-    assert.equal(saved.status, "running")
+    assert.equal(saved.status, "assigned")
     assert.equal(saved.completedAt, null)
     assert.ok(Date.parse(saved.assignedAt) >= before && Date.parse(saved.assignedAt) <= Date.now())
     assert.equal(context.tickets.get(context.ticket.id)?.status, "In progress")
@@ -82,6 +82,18 @@ test("assignTicket reuses active ownership after a board refresh, even with a ne
     const refreshed = await context.schedulerDatabase.saveTicket(context.ticket)
     const restartedManager = new AgentManager(context.schedulerDatabase, context.agents, context.assignments)
     assert.deepEqual(await restartedManager.assignTicket(refreshed), first)
+    assert.equal(context.assignments.list().length, 1)
+  } finally {
+    context.database.close()
+  }
+})
+
+test("assignTicket preserves an existing running assignment", async () => {
+  const context = setup()
+  try {
+    const agent = context.agents.create({ name: "frontend", status: "idle" })
+    const existing = context.assignments.create({ ticketId: context.ticket.id, agentId: agent.id, status: "running" })
+    assert.deepEqual(await context.manager.assignTicket(context.ticket), existing)
     assert.equal(context.assignments.list().length, 1)
   } finally {
     context.database.close()

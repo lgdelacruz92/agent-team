@@ -37,7 +37,7 @@ export class AgentManager implements AgentManagerInterface {
     return this.database.createAssignment({
       ticketId: ticket.id,
       agentId: agent.id,
-      assignmentStatus: "running",
+      assignmentStatus: "assigned",
       ticketStatus: "In progress",
       assignedAt: new Date().toISOString(),
     })

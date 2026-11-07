@@ -18,7 +18,7 @@ const assignment: Assignment = {
   id: 10,
   ticketId: readyTicket.id,
   agentId: 3,
-  status: "running",
+  status: "assigned",
   assignedAt: "2026-11-06T12:00:00.000Z",
   completedAt: null,
 }

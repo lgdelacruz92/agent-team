@@ -101,11 +101,11 @@ Use the imports shown below. This example generates an ID locally; it does not p
 
 The database is intended to be the source of truth for system state. A separate app will watch the agent and assignment records and reconcile the real agent resources with the desired state. The scheduler records assignments; it does not start or monitor agents or update agent status. The watcher is intended to report real agent status and observed progress back to the database, using `assignments.agent_id` to find the real agent by `agents.id`. A saved assignment alone is not proof that an agent is running. An incomplete assignment reserves the agent even while its status remains `idle`.
 
-One possible future flow is for the scheduler to record `assigned`, then for the watcher to report `running` after confirming startup and `completed` or `failed` after work ends. The exact lifecycle and write ownership still need implementation. The watcher is not implemented here, and the current scheduler writes `running` immediately as described below.
+The scheduler records new assignments as `assigned`. A possible future flow is for the watcher to report `running` after confirming startup and `completed` or `failed` after work ends. The watcher and the rest of the lifecycle are not implemented here. Existing assignment statuses are not migrated.
 
 - `idle`: eligible, provided the agent has no assignment whose `completedAt` is null.
 - `busy`: ineligible for new assignments. The scheduler does not set this status; the future watcher is responsible for reporting agent status. Other status strings are excluded.
-- Assignment `running`: bookkeeping for active ownership, not proof that an AI worker is executing.
+- Assignment `assigned`: ownership recorded, not proof that an AI worker is executing. Older records may still say `running`; the scheduler does not verify that they are running.
 - Completion: still manual through the stores until the watcher exists. Set the assignment's completion timestamp and report the agent as idle only when its work is actually finished. Moving the board card to Done alone does not release the reservation.
 
 `SchedulerDatabase` now receives the shared SQLite connection and constructs its own stores. `AgentManager` receives the scheduler database, AgentStore, and AssignmentStore on that same connection. Transactions recheck persisted ticket readiness and agent availability and reject duplicate active ownership. Raw stores remain low-level CRUD and can bypass these scheduling rules.

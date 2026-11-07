@@ -134,7 +134,7 @@ for (const hasAgent of [false, true]) {
         assert.equal(moveRequests, 2)
         assert.equal(assignments[0].ticketId, 1)
         assert.equal(assignments[0].agentId, 1)
-        assert.equal(assignments[0].status, "running")
+        assert.equal(assignments[0].status, "assigned")
         assert.equal(assignments[0].completedAt, null)
         assert.equal(new AgentStore(database).get(1)?.status, "idle")
         assert.match(output, /scheduler pass failed:.*Vikunja POST .*HTTP 500/)
