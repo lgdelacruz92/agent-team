@@ -9,3 +9,5 @@ This folder is reserved for a future app that watches scheduler assignments and 
 The handoff is context for future work, not authorization to start agents, modify infrastructure, or implement the app without a request.
 
 For session decisions and current progress, read [session context](docs/session-context.md).
+
+For the initial direction, see the [proposed flowchart](docs/flowchart.md) and [build proposal](docs/proposal.md).

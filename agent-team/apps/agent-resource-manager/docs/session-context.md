@@ -19,3 +19,5 @@ Estimated reading time: 2 minutes (150 WPM)
 - Reviewed the app README, scheduler handoff, scheduler README, scheduling and assignment components, and database schema.
 - User requested per-prompt notes so they and another agent can resume work later.
 - User approved and requested a commit of the initial notes and README link.
+- User requested an initial build proposal and a visual flowchart in `docs/`. See [proposal](proposal.md) and [flowchart](flowchart.md); both are preliminary, not approval to implement.
+- User requested committing the proposal, flowchart, and related documentation updates.
