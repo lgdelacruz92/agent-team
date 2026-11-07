@@ -1,6 +1,6 @@
 # Scheduler session context
 
-Estimated reading time: 17 minutes (150 WPM)
+Estimated reading time: 18 minutes (150 WPM)
 
 ## Purpose
 
@@ -135,3 +135,8 @@ The user then added the project goal and requested another commit.
 - Updated `index.ts` wiring. Startup does not invent agents or live connection settings. Registration is explicit through AgentStore. No OpenCode sessions are started; `running` is local ownership bookkeeping, not evidence of worker execution. Completion monitoring and releasing busy agents remain future work.
 - Replaced obsolete placeholder tests with assignment tests and added agent-manager and movement coverage. Tests cover successful claims, eligibility, duplicate prevention, completed history, write failures and rollback, HTTP/data/network errors, and local fake-board startup with no agents or a failed move followed by success. No request was made to the user's board.
 - Verification: all 68 tests passed, application and all-test-file typechecks passed, and build passed. README documents registration, statuses, transaction boundaries, retry behavior, and the remaining dispatch/completion work.
+
+## External agent synchronizer proposal
+
+- The user says agent IDs will be pre-populated and can be assumed to correspond to real agents. A separate app will watch the database and synchronize its real agents according to table state.
+- This is a proposed integration direction; the exact contract remains to be decided, including who writes desired and observed states, how the other app starts work and reports completion or failure, and how retries avoid duplicate execution. No implementation change was requested.

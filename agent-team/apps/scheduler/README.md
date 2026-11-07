@@ -1,6 +1,6 @@
 # Scheduler v2 scaffold
 
-Estimated reading time: 7 minutes (150 WPM)
+Estimated reading time: 8 minutes (150 WPM)
 
 Standalone TypeScript Express app with SQLite persistence, local agent assignment, and Vikunja Kanban card movement. `index.ts` runs `Scheduler.runOnce()` continuously. Assignment reserves a local agent; it does not start an OpenCode session. Worker dispatch and completion handling are not implemented. The existing `frontend-ctr` stays separate.
 
@@ -30,20 +30,11 @@ Defaults to `http://127.0.0.1:3300`. No authentication: keep it local.
 
 Export these Vikunja settings before `npm run dev` or `npm start`; this app does not automatically load `.env.local`. IDs and credentials have no working defaults.
 
-The database directory and table are created automatically. Database files are git-ignored. Keep the same database path to retain state across restarts.
+The database directory and domain tables are created automatically. Database files are git-ignored. Keep the same database path to retain state across restarts.
 
 ## Endpoints
 
 - `GET /health`: liveness check.
-- `PUT /state/:key`: save JSON using a body containing `value`.
-- `GET /state/:key`: retrieve saved JSON; missing keys return 404.
-
-```sh
-curl -X PUT http://127.0.0.1:3300/state/example \
-  -H 'Content-Type: application/json' \
-  -d '{"value":{"paused":true}}'
-curl http://127.0.0.1:3300/state/example
-```
 
 ## Checks
 
@@ -58,7 +49,7 @@ npm start
 
 `src/components/vikunja.ts` reads one existing Kanban board. `index.ts` constructs the components from environment settings and starts `runSchedulerLoop` after the HTTP server begins listening. The first pass starts immediately; after every pass, the loop waits `SCHEDULER_POLL_MS` and repeats. Passes never overlap. Errors are logged and retried after the same wait; HTTP endpoints remain available.
 
-SIGINT or SIGTERM stops the loop and cancels its polling wait. An active pass finishes before either SQLite connection closes. `Scheduler.runOnce()` remains one pass; repetition lives in `src/scheduler-loop.ts`.
+SIGINT or SIGTERM stops the loop and cancels its polling wait. An active pass finishes before the SQLite connection closes. `Scheduler.runOnce()` remains one pass; repetition lives in `src/scheduler-loop.ts`.
 
 `SchedulerDatabase.saveTicket()` creates or updates each fetched ticket by its Vikunja task ID, preserving its local ID and copying title, status, and priority exactly. Repeated saves do not create duplicates. Tickets absent from a fetch are not deleted.
 
@@ -91,9 +82,9 @@ Optional `perPage` defaults to 50; `timeoutMs` defaults to 30,000 milliseconds p
 
 ## Local agents and assignments
 
-Agents must be registered explicitly in the domain database. Startup does not create agents, probe OpenCode servers, or load a worker list. A fresh database therefore keeps polling without assigning anything. The generic `/state` endpoints do not register agents.
+The scheduler assumes the `agents` table is already populated with valid real agent IDs and states. Provisioning those agents and populating the table are outside this app's scope. `agents.id` is the real ID the watcher uses to identify the agent; no separate external ID is planned. Startup does not create agents, probe OpenCode servers, or load a worker list. A fresh database therefore keeps polling without assigning anything.
 
-Register a local agent once through `AgentStore`, for example:
+For local testing, an agent can be inserted through `AgentStore`, for example:
 
 ```ts
 const database = openDatabase("data/scheduler.sqlite")
@@ -104,7 +95,13 @@ try {
 }
 ```
 
-Use the imports shown below. The name identifies a local record, not an OpenCode endpoint. Do not run registration every pass; agent names are not unique.
+Use the imports shown below. This example generates an ID locally; it does not provision a real agent or ensure the generated ID matches one. The name is not an OpenCode endpoint. Do not run it every pass; agent names are not unique.
+
+### Intended watcher contract
+
+The database is intended to be the source of truth for system state. A separate app will watch the agent and assignment records and reconcile the real agent resources with the desired state. The scheduler records assignments; it does not start or monitor agents. The watcher will use `assignments.agent_id` to find the real agent by `agents.id` and report observed progress back to the database. A saved assignment alone is not proof that an agent is running.
+
+One possible future flow is for the scheduler to record `assigned`, then for the watcher to report `running` after confirming startup and `completed` or `failed` after work ends. The exact lifecycle and write ownership still need implementation. The watcher is not implemented here, and the current scheduler writes `running` immediately as described below.
 
 - `idle`: eligible, provided the agent has no assignment whose `completedAt` is null.
 - `busy`: reserved by assignment creation. Other status strings are excluded.
@@ -142,8 +139,8 @@ database.close()
 
 Each store exposes `create`, `get`, `list`, `update`, and `delete`. Updates replace all mutable fields; missing records return `undefined`. Deletion returns whether a record was removed.
 
-SQLite generates local IDs. IDs use JavaScript numbers within the safe integer range. Timestamps use ISO 8601 strings; new assignments default to the current UTC time and a null completion time. Status values remain unrestricted strings.
+The stores currently let SQLite generate IDs, including `agents.id`; they do not verify that an agent ID identifies a real resource. IDs use JavaScript numbers within the safe integer range. Timestamps use ISO 8601 strings; new assignments default to the current UTC time and a null completion time. Status values remain unrestricted strings.
 
 Foreign keys prevent orphan assignments and deletion of referenced tickets or agents. Delete assignments explicitly first. The stores do not impose scheduling rules.
 
-The existing HTTP endpoints still use `StateStore` for generic JSON state. The scheduling loop uses a separate shared connection for domain stores; those stores still have no HTTP routes.
+The scheduling loop uses a shared connection for domain stores; those stores have no HTTP routes.
