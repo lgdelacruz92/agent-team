@@ -69,12 +69,6 @@ export class SchedulerDatabase implements SchedulerDatabaseInterface {
         status: assignment.assignmentStatus,
         assignedAt: assignment.assignedAt,
       })
-      const savedTicket = this.tickets.update(ticket.id, { ...ticket, status: assignment.ticketStatus })
-
-      if (!savedTicket) {
-        throw new Error("Ticket disappeared while creating the assignment")
-      }
-
       this.database.exec("COMMIT")
       return savedAssignment
     } catch (error) {
@@ -83,10 +77,15 @@ export class SchedulerDatabase implements SchedulerDatabaseInterface {
     }
   }
 
-  // Only tickets present on the latest board are schedulable.
+  // Incomplete assignments reserve tickets even while the board still says Ready or Retry.
   async getReadyTickets(): Promise<SchedulerTicket[]> {
     const tickets = this.tickets.list()
+    const assignedTicketIds = new Set(this.assignments.list()
+      .filter((assignment) => assignment.completedAt === null)
+      .map((assignment) => assignment.ticketId))
 
-    return tickets.filter((ticket) => ticket.presentOnBoard && (ticket.status === "Ready" || ticket.status === "Retry"))
+    return tickets.filter((ticket) => ticket.presentOnBoard
+      && (ticket.status === "Ready" || ticket.status === "Retry")
+      && !assignedTicketIds.has(ticket.id))
   }
 }

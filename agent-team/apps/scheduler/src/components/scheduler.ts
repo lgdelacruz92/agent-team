@@ -24,13 +24,7 @@ export class Scheduler implements SchedulerInterface {
       return
     }
 
-    // The agent manager records the assignment before returning it.
-    const assignment = await this.agentManager.assignTicket(nextTicket)
-
-    if (assignment === null) {
-      return
-    }
-
-    await this.vikunja.markInProgress(nextTicket.vikunjaTaskId)
+    // The agent manager records the assignment; the resource manager handles execution.
+    await this.agentManager.assignTicket(nextTicket)
   }
 }

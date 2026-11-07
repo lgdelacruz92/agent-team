@@ -1,4 +1,4 @@
-// Checks local agent selection, reservation, and reuse after a failed board move.
+// Checks local agent selection, reservation, and assignment reuse.
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { AgentManager } from "../src/components/agent-manager.js"
@@ -39,7 +39,7 @@ test("assignTicket chooses the first idle agent, skipping offline, busy, and res
     assert.equal(saved.status, "assigned")
     assert.equal(saved.completedAt, null)
     assert.ok(Date.parse(saved.assignedAt) >= before && Date.parse(saved.assignedAt) <= Date.now())
-    assert.equal(context.tickets.get(context.ticket.id)?.status, "In progress")
+    assert.equal(context.tickets.get(context.ticket.id)?.status, "Ready")
     assert.equal(context.agents.get(firstFree.id)?.status, "idle")
     assert.equal(context.agents.get(secondFree.id)?.status, "idle")
   } finally {

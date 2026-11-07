@@ -21,7 +21,6 @@ export interface NewAssignment {
   ticketId: number
   agentId: number
   assignmentStatus: string
-  ticketStatus: string
   assignedAt: string
 }
 
@@ -29,10 +28,10 @@ export interface SchedulerDatabaseInterface {
   // Atomically reconcile a complete successful board fetch, preserving missing ticket records.
   syncTickets(tickets: VikunjaTicket[]): Promise<void>
 
-  // Return present Ready and Retry tickets in local ID order, preserving their stored statuses.
+  // Return present, unassigned Ready and Retry tickets in local ID order.
   getReadyTickets(): Promise<SchedulerTicket[]>
 
-  // Create the assignment and update the local ticket atomically without changing agent status.
+  // Create an assignment atomically without changing the ticket or agent status.
   // Reject missing/non-ready tickets, unavailable agents, and duplicate active assignments.
   createAssignment(assignment: NewAssignment): Promise<Assignment>
 }

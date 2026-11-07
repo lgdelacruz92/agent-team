@@ -12,7 +12,7 @@ export class AgentManager implements AgentManagerInterface {
   ) {}
 
   async assignTicket(ticket: SchedulerTicket): Promise<Assignment | null> {
-    // A failed Vikunja move may leave the board Ready. Reuse ownership on the next pass.
+    // Reuse an existing claim if this method is called again for the same ticket.
     const existingAssignment = this.assignments.listByTicketId(ticket.id)
       .find((assignment) => assignment.completedAt === null)
 
@@ -38,7 +38,6 @@ export class AgentManager implements AgentManagerInterface {
       ticketId: ticket.id,
       agentId: agent.id,
       assignmentStatus: "assigned",
-      ticketStatus: "In progress",
       assignedAt: new Date().toISOString(),
     })
   }

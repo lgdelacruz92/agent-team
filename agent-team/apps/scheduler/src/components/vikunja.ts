@@ -57,7 +57,7 @@ function readBuckets(value: unknown): KanbanBucket[] {
   })
 }
 
-// Reads board tickets and moves assigned cards to the exact In progress column.
+// Reads board tickets; a separate resource manager handles card movement.
 export class Vikunja implements VikunjaInterface {
   private readonly baseUrl: string
   private readonly perPage: number
@@ -133,41 +133,6 @@ export class Vikunja implements VikunjaInterface {
       }
 
       page += 1
-    }
-  }
-
-  async markInProgress(vikunjaTaskId: number): Promise<void> {
-    if (!isPositiveInteger(vikunjaTaskId)) {
-      throw new Error("Vikunja task ID must be a positive safe integer")
-    }
-
-    // Every column is included on the first card page, even when its tasks are empty.
-    const buckets = await this.getPage(1)
-    const destinations = buckets.filter((bucket) => bucket.title === "In progress")
-
-    if (destinations.length !== 1) {
-      throw new Error('Vikunja board must have exactly one "In progress" column')
-    }
-
-    const bucket = destinations[0]
-    const path = `/api/v1/projects/${this.options.projectId}/views/${this.options.viewId}/buckets/${bucket.id}/tasks`
-    const response = await this.fetchRequest(`${this.baseUrl}${path}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.options.token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        task_id: vikunjaTaskId,
-        bucket_id: bucket.id,
-        project_view_id: this.options.viewId,
-        project_id: this.options.projectId,
-      }),
-      signal: AbortSignal.timeout(this.timeoutMs),
-    })
-
-    if (!response.ok) {
-      throw new Error(`Vikunja POST ${path} returned HTTP ${response.status}`)
     }
   }
 

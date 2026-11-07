@@ -28,16 +28,11 @@ function setup() {
   const events: string[] = []
   const savedTickets: VikunjaTicket[] = []
   const assignedTickets: SchedulerTicket[] = []
-  const markedTaskIds: number[] = []
 
   const vikunja: VikunjaInterface = {
     async getTickets() {
       events.push("getTickets")
       return [readyTicket, retryTicket]
-    },
-    async markInProgress(taskId) {
-      events.push("markInProgress")
-      markedTaskIds.push(taskId)
     },
   }
   const database: SchedulerDatabaseInterface = {
@@ -62,19 +57,18 @@ function setup() {
   }
 
   const scheduler = new Scheduler(vikunja, database, agentManager)
-  return { scheduler, vikunja, database, agentManager, events, savedTickets, assignedTickets, markedTaskIds }
+  return { scheduler, vikunja, database, agentManager, events, savedTickets, assignedTickets }
 }
 
-test("runOnce saves every fetched ticket before assigning one and marking its Vikunja ID in progress", async () => {
+test("runOnce saves every fetched ticket before assigning one", async () => {
   const context = setup()
 
   assert.equal(await context.scheduler.runOnce(), undefined)
   assert.deepEqual(context.events, [
-    "getTickets", "syncTickets", "getReadyTickets", "assignTicket", "markInProgress",
+    "getTickets", "syncTickets", "getReadyTickets", "assignTicket",
   ])
   assert.deepEqual(context.savedTickets, [readyTicket, retryTicket])
   assert.deepEqual(context.assignedTickets, [readyTicket])
-  assert.deepEqual(context.markedTaskIds, [42])
 })
 
 test("runOnce returns without assignment when the database has no ready tickets", async () => {
@@ -84,10 +78,9 @@ test("runOnce returns without assignment when the database has no ready tickets"
   await context.scheduler.runOnce()
   assert.equal(context.savedTickets.length, 2)
   assert.deepEqual(context.assignedTickets, [])
-  assert.deepEqual(context.markedTaskIds, [])
 })
 
-test("runOnce returns when no agent is available without marking or attempting another ticket", async () => {
+test("runOnce returns when no agent is available without attempting another ticket", async () => {
   const context = setup()
   context.agentManager.assignTicket = async (ticket) => {
     context.assignedTickets.push(ticket)
@@ -96,7 +89,6 @@ test("runOnce returns when no agent is available without marking or attempting a
 
   await context.scheduler.runOnce()
   assert.deepEqual(context.assignedTickets, [readyTicket])
-  assert.deepEqual(context.markedTaskIds, [])
 })
 
 test("runOnce trusts database ordering and accepts Retry as conceptually ready", async () => {
@@ -105,7 +97,6 @@ test("runOnce trusts database ordering and accepts Retry as conceptually ready",
 
   await context.scheduler.runOnce()
   assert.deepEqual(context.assignedTickets, [retryTicket])
-  assert.deepEqual(context.markedTaskIds, [retryTicket.vikunjaTaskId])
   assert.equal(retryTicket.status, "Retry")
 })
 
@@ -120,7 +111,7 @@ test("runOnce synchronizes an empty board and does not assign absent tickets", a
   assert.ok(context.events.includes("syncTickets"))
 })
 
-for (const stage of ["getTickets", "syncTickets", "getReadyTickets", "assignTicket", "markInProgress"] as const) {
+for (const stage of ["getTickets", "syncTickets", "getReadyTickets", "assignTicket"] as const) {
   test(`runOnce propagates ${stage} errors and stops the pass`, async () => {
     const context = setup()
     const error = new Error(`${stage} failed`)
@@ -134,11 +125,9 @@ for (const stage of ["getTickets", "syncTickets", "getReadyTickets", "assignTick
       case "syncTickets": context.database.syncTickets = fail; break
       case "getReadyTickets": context.database.getReadyTickets = fail; break
       case "assignTicket": context.agentManager.assignTicket = fail; break
-      case "markInProgress": context.vikunja.markInProgress = fail; break
     }
 
     await assert.rejects(context.scheduler.runOnce(), (actual) => actual === error)
     assert.equal(context.events.at(-1), `failed:${stage}`)
-    assert.deepEqual(context.markedTaskIds, [])
   })
 }

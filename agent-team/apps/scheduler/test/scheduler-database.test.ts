@@ -53,7 +53,7 @@ test("an empty successful board marks all tickets absent without deleting assign
     assert.deepEqual(await scheduler.getReadyTickets(), [])
     await assert.rejects(scheduler.createAssignment({
       ticketId: ticket.id, agentId: agent.id, assignmentStatus: "assigned",
-      ticketStatus: "In progress", assignedAt: new Date().toISOString(),
+      assignedAt: new Date().toISOString(),
     }), /not ready/)
   } finally {
     database.close()
@@ -94,7 +94,6 @@ test("a failed board fetch leaves presence unchanged and skips assignment", asyn
     const before = tickets.list()
     const scheduler = new Scheduler({
       async getTickets() { throw new Error("board unavailable") },
-      async markInProgress() { assert.fail("must not move a card") },
     }, schedulerDatabase, new AgentManager(schedulerDatabase, agents, assignments))
 
     await assert.rejects(scheduler.runOnce(), /board unavailable/)
@@ -116,7 +115,6 @@ test("a successful fetch missing a previously ready ticket cannot assign it", as
     await schedulerDatabase.syncTickets([first])
     const scheduler = new Scheduler({
       async getTickets() { return [] },
-      async markInProgress() { assert.fail("must not move a missing card") },
     }, schedulerDatabase, new AgentManager(schedulerDatabase, agents, assignments))
     await scheduler.runOnce()
     assert.equal(tickets.getByVikunjaTaskId(first.vikunjaTaskId)?.presentOnBoard, false)
@@ -139,6 +137,30 @@ test("getReadyTickets selects only present Ready and Retry tickets in local ID o
     const ready = await scheduler.getReadyTickets()
     assert.deepEqual(ready.map((ticket) => ticket.vikunjaTaskId), [42, 44])
     assert.deepEqual(ready.map((ticket) => ticket.status), ["Ready", "Retry"])
+  } finally {
+    database.close()
+  }
+})
+
+test("getReadyTickets skips incomplete assignments and allows completed history", async () => {
+  const database = openDatabase(":memory:")
+  try {
+    const scheduler = new SchedulerDatabase(database)
+    const tickets = new TicketStore(database)
+    const agents = new AgentStore(database)
+    const assignments = new AssignmentStore(database)
+    await scheduler.syncTickets([first, second])
+    const firstTicket = tickets.getByVikunjaTaskId(first.vikunjaTaskId)!
+    const secondTicket = tickets.getByVikunjaTaskId(second.vikunjaTaskId)!
+    const agent = agents.create({ name: "agent", status: "idle" })
+    const active = assignments.create({ ticketId: firstTicket.id, agentId: agent.id, status: "assigned" })
+    const completed = assignments.create({ ticketId: secondTicket.id, agentId: agent.id, status: "completed", completedAt: "2026-11-07T12:00:00.000Z" })
+
+    assert.deepEqual(await scheduler.getReadyTickets(), [secondTicket])
+    assignments.update(active.id, { ...active, status: "completed", completedAt: "2026-11-07T12:01:00.000Z" })
+    assert.deepEqual(await scheduler.getReadyTickets(), [firstTicket, secondTicket])
+    assignments.update(completed.id, { ...completed, completedAt: null })
+    assert.deepEqual(await scheduler.getReadyTickets(), [firstTicket])
   } finally {
     database.close()
   }

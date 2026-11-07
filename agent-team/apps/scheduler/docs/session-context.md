@@ -13,16 +13,16 @@ The user also hopes the scheduling system can serve as a blueprint for many appl
 - `scheduler/` is a standalone TypeScript and Express scaffold with SQLite persistence.
 - It has a health endpoint, domain stores for tickets, agents and assignments, and interfaces for future components. The generic state store and endpoints were removed.
 - `Scheduler.runOnce()` orchestration and Vikunja Kanban fetching are implemented. `index.ts` constructs the components and starts a non-overlapping scheduling loop after the HTTP server starts. Worker dispatch is not implemented. `frontend-ctr` remains separate.
-- The SQLite stores, HTTP scaffold, ticket sync, assignment creation, local agent selection, and `Vikunja.markInProgress` are implemented. No throwing placeholders remain. Local assignment reserves an agent; OpenCode session dispatch and completion/release handling remain unfinished.
-- Agent selection uses exact status `idle` and no assignment with null `completedAt`, in local agent ID order. Assignment creation updates the ticket and saves ownership atomically, without changing agent status. The future watcher owns reporting real agent status; an incomplete assignment prevents double booking while the agent still reports idle. Agents are prepopulated externally with real IDs; startup does not seed agents or discover OpenCode workers.
+- The SQLite stores, HTTP scaffold, ticket sync, assignment creation, and local agent selection are implemented. Local assignment reserves an agent; OpenCode session dispatch, card movement, and completion/release handling belong to the future watcher and remain unfinished.
+- Agent selection uses exact status `idle` and no assignment with null `completedAt`, in local agent ID order. Assignment creation saves ownership atomically without changing ticket or agent status. The future watcher owns reporting real agent status; an incomplete assignment prevents double booking while the agent still reports idle. Agents are prepopulated externally with real IDs; startup does not seed agents or discover OpenCode workers.
 - The user prefers to start with the scheduler database, thinking about the data before the scheduling workflow.
 - The first implemented method is `SchedulerDatabaseInterface.getReadyTickets`. The user initially deferred `VikunjaInterface`, then asked to implement Vikunja tickets next.
-- The ready-ticket lookup selects tickets present in the latest successful board fetch whose status is exactly `Ready` or `Retry`, in local ID order, without changing their stored statuses. Both statuses are conceptually ready to schedule. Dependency and priority rules are not implemented.
+- The ready-ticket lookup selects tickets present in the latest successful board fetch whose status is exactly `Ready` or `Retry` and which have no incomplete assignment, in local ID order. Dependency and priority rules are not implemented.
 - The Vikunja fetch is scoped to the user's existing Kanban board for this session. `frontend-ctr` uses one project and view; that is API reference, not a design to copy automatically.
 
 ## Intended communication
 
-`docs/architecture.comm.md` diagrams the proposed flow: fetch Vikunja tickets, save them locally, select a ready ticket, ask the Agent Manager to assign it, record the assignment, and move the Vikunja ticket to In progress. If no agent is available, retry later. The user moved this diagram into `docs/` during this session.
+`docs/architecture.comm.md` diagrams the scheduler flow: fetch Vikunja tickets, save them locally, select an unassigned ready ticket, and ask the Agent Manager to record an assignment. If no agent is available, retry later. The future watcher will move the card after the agent starts.
 
 ## Working agreement
 
@@ -150,5 +150,7 @@ The user then added the project goal and requested another commit.
 ## Scheduler reliability discussion
 
 - The user wants a practical assessment of common operating cases, not exhaustive edge-case hardening; a human can monitor and restart the app.
-- Important gaps identified: Vikunja refreshes overwrite local ticket status; a failed move on the first ready ticket can block later work; health reports process liveness, not successful scheduling. The app does not move completed cards to Done or release assignments automatically.
+- Initially identified gaps included Vikunja refreshes overwriting local ticket status, failed scheduler-owned moves blocking later work, and health reporting only process liveness. Later decisions below clarify status ownership and move card movement out of the scheduler. The app does not move completed cards to Done or release assignments automatically.
 - The user accepted adding `present_on_board` so tickets absent from a successful fetch cannot receive new assignments. Board sync updates presence atomically; missing ticket records and existing assignments remain. Failed fetches leave presence unchanged. Existing databases migrate with tickets absent until the next successful sync.
+- The user chose Vikunja as the authority for card column status, while the database owns assignments and agent state. Manual card moves do not automatically change assignments or stop agents; any additional handling remains a separate decision.
+- The user decided the future watcher will move cards to `In progress` after confirming startup. The scheduler no longer moves cards or changes ticket status during assignment; it skips tickets with incomplete assignments. Completion versus card movement still needs coordination to prevent reassigning a completed ticket left in `Ready` or `Retry`.

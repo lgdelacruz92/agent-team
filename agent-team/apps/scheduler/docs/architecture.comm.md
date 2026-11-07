@@ -15,18 +15,16 @@ sequenceDiagram
     S->>DB: Atomically sync tickets and board presence
     DB-->>S: Board snapshot saved
 
-    S->>DB: Get ready tickets
-    DB-->>S: Return ready tickets
+    S->>DB: Get present ready tickets without active assignments
+    DB-->>S: Return eligible tickets
     S->>S: Choose next ticket
 
     S->>A: Assign ticket to an available agent
 
     alt Agent is available
-        A->>DB: Create assignment and update ticket
+        A->>DB: Create assignment without changing ticket or agent status
         DB-->>A: Assignment saved
         A-->>S: Assignment confirmed
-        S->>V: Update ticket to in progress
-        V-->>S: Ticket updated
     else No agent is available
         A-->>S: No available agent
         S->>S: Retry later
