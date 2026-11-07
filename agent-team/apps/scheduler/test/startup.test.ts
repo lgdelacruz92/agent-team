@@ -12,7 +12,7 @@ import { test } from "node:test"
 
 const projectDirectory = fileURLToPath(new URL("..", import.meta.url))
 
-test("index.ts calls runOnce at startup, logs its placeholder failure, and shuts down cleanly", { timeout: 15_000 }, async (t) => {
+test("index.ts continuously retries failed passes and shuts down cleanly", { timeout: 15_000 }, async (t) => {
   let boardRequests = 0
   const board = createServer((request, response) => {
     boardRequests += 1
@@ -43,6 +43,7 @@ test("index.ts calls runOnce at startup, logs its placeholder failure, and shuts
       HOST: "127.0.0.1",
       PORT: String(port),
       SCHEDULER_DB_PATH: join(directory, "scheduler.sqlite"),
+      SCHEDULER_POLL_MS: "20",
       VIKUNJA_URL: `http://127.0.0.1:${(board.address() as AddressInfo).port}`,
       VIKUNJA_API_TOKEN: "test-token",
       VIKUNJA_PROJECT_ID: "3",
@@ -63,7 +64,7 @@ test("index.ts calls runOnce at startup, logs its placeholder failure, and shuts
   await new Promise<void>((resolve, reject) => {
     const receive = (chunk: Buffer) => {
       output += chunk.toString()
-      if (output.includes("SchedulerDatabase.saveTicket is not implemented")) {
+      if ((output.match(/scheduler pass failed:/g) ?? []).length >= 2) {
         resolve()
       }
     }
@@ -73,12 +74,12 @@ test("index.ts calls runOnce at startup, logs its placeholder failure, and shuts
     child.once("exit", () => reject(new Error(`Scheduler exited before its startup pass: ${output}`)))
   })
 
-  assert.match(output, /scheduler pass failed:/)
+  assert.match(output, /SchedulerDatabase.saveTicket is not implemented/)
   const response = await fetch(`http://127.0.0.1:${port}/health`)
   assert.deepEqual(await response.json(), { ok: true, service: "scheduler" })
   child.kill("SIGTERM")
   const [code, signal] = await exited
   assert.equal(code, 0)
   assert.equal(signal, null)
-  assert.equal(boardRequests, 1)
+  assert.ok(boardRequests >= 2)
 })

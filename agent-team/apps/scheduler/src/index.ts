@@ -1,4 +1,4 @@
-// Starts the HTTP server and runs one scheduling pass with the configured components.
+// Starts the HTTP server and continuous scheduling with the configured components.
 import { createApp } from "./app.js"
 import { AgentManager } from "./components/agent-manager.js"
 import { Scheduler } from "./components/scheduler.js"
@@ -8,6 +8,7 @@ import { config } from "./config.js"
 import { openDatabase } from "./db/database.js"
 import { StateStore } from "./db/state-store.js"
 import { TicketStore } from "./db/ticket-store.js"
+import { runSchedulerLoop } from "./scheduler-loop.js"
 
 if (!config.vikunja.baseUrl) {
   throw new Error("VIKUNJA_URL is required")
@@ -20,21 +21,21 @@ const agentManager = new AgentManager(schedulerDatabase)
 const scheduler = new Scheduler(vikunja, schedulerDatabase, agentManager)
 const store = new StateStore(config.databasePath)
 
-// A failed pass is logged; the HTTP scaffold stays available. No polling loop yet.
+const schedulingController = new AbortController()
 let scheduling: Promise<void> = Promise.resolve()
 const server = createApp(store).listen(config.port, config.host, () => {
   console.log(`scheduler listening on http://${config.host}:${config.port}`)
-  scheduling = scheduler.runOnce().catch((error) => {
-    console.error("scheduler pass failed:", error)
+  scheduling = runSchedulerLoop(scheduler, config.pollMs, schedulingController.signal).catch((error) => {
+    console.error("scheduler loop failed:", error)
+    process.exitCode = 1
+    shutdown()
   })
 })
 
-server.on("error", async (error) => {
+server.on("error", (error) => {
   console.error("scheduler server failed:", error)
-  await scheduling
-  store.close()
-  database.close()
   process.exitCode = 1
+  shutdown()
 })
 
 // Stop accepting requests before releasing the database used by route handlers.
@@ -46,8 +47,9 @@ function shutdown(): void {
   }
 
   stopping = true
+  schedulingController.abort()
   server.close(async () => {
-    // Let the in-flight pass finish before releasing either SQLite connection.
+    // Cancel the polling wait, but finish an active pass before closing SQLite.
     await scheduling
     store.close()
     database.close()

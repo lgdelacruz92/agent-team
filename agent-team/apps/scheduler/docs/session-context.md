@@ -1,6 +1,6 @@
 # Scheduler session context
 
-Estimated reading time: 11 minutes (150 WPM)
+Estimated reading time: 12 minutes (150 WPM)
 
 ## Purpose
 
@@ -12,7 +12,7 @@ The user also hopes the scheduling system can serve as a blueprint for many appl
 
 - `scheduler/` is a standalone TypeScript and Express scaffold with SQLite persistence.
 - It has generic state endpoints, domain stores for tickets, agents and assignments, and interfaces for future components.
-- `Scheduler.runOnce()` orchestration and Vikunja Kanban fetching are implemented. `index.ts` constructs the components and calls `runOnce` once after the HTTP server starts. No polling or worker dispatch is implemented. `frontend-ctr` remains separate.
+- `Scheduler.runOnce()` orchestration and Vikunja Kanban fetching are implemented. `index.ts` constructs the components and starts a non-overlapping scheduling loop after the HTTP server starts. Worker dispatch is not implemented. `frontend-ctr` remains separate.
 - The SQLite stores and HTTP scaffold are implemented. `saveTicket`, `createAssignment`, `AgentManager.assignTicket`, and `markInProgress` are explicit throwing placeholders; real behavior remains unfinished.
 - The user prefers to start with the scheduler database, thinking about the data before the scheduling workflow.
 - The first implemented method is `SchedulerDatabaseInterface.getReadyTickets`. The user initially deferred `VikunjaInterface`, then asked to implement Vikunja tickets next.
@@ -87,4 +87,15 @@ The user then added the project goal and requested another commit.
 - Configuration requires exported `VIKUNJA_URL`, `VIKUNJA_API_TOKEN`, `VIKUNJA_PROJECT_ID`, and `VIKUNJA_VIEW_ID`. No real IDs or credentials were supplied or guessed. Missing/invalid settings prevent startup; `.env.local` is not loaded automatically.
 - Shutdown waits for the startup pass before closing both state and domain SQLite connections. With fetched cards, the current pass fails explicitly at the unfinished `saveTicket` method.
 - Added placeholder tests and a subprocess startup test against a local fake board. Verified one board request, explicit placeholder failure, continued HTTP health access, and clean SIGTERM shutdown. No request was made to the user's board. All 36 tests, application and new-test-file typechecks, and build passed.
-- The user requested committing the startup wiring, Agent Manager shell, approved placeholders, configuration, tests, and documentation.
+- The user requested committing the startup wiring, Agent Manager shell, approved placeholders, configuration, tests, and documentation. Committed as `ca529c8`.
+- The user asked why `runOnce` has no loop. The startup request was interpreted as a single call, not continuous polling, despite the earlier discussion of a caller-controlled loop. Clarified that ongoing scheduling requires an external loop awaiting each pass, handling errors, waiting, and repeating until shutdown. At that point no automatic later retry occurred. The user subsequently requested continuous scheduling.
+
+## Continuous scheduling
+
+- The user authorized continuous scheduling. Added `src/scheduler-loop.ts`, accepting `SchedulerInterface`, polling delay, and an abort signal. `runOnce` itself remains unchanged.
+- The first pass runs immediately after the HTTP server starts. Each pass is awaited, errors are logged, and the loop waits before trying again. No overlapping passes or tight retry loop, including when no ticket or agent is available.
+- `SCHEDULER_POLL_MS` configures the delay after each pass, defaulting to 30,000 milliseconds. Reject non-integers, non-positive values, and values above Node's timer limit of 2147483647 milliseconds.
+- SIGINT, SIGTERM, or server failure stops the loop and cancels any polling wait. An active pass completes before SQLite closes. Unexpected loop-level failure logs an error and initiates shutdown.
+- Existing dependency placeholders remain untouched; continuous scheduling still logs their explicit failures until the real methods are implemented.
+- Added loop tests for repetition, error recovery, non-overlap, aborting the wait, and waiting for active work. Updated the real-entry-point test to verify repeated failed passes against a local fake board and clean shutdown. All 40 tests, application/new-test-file typechecks, and build passed. README reflects continuous operation.
+- The user requested committing the continuous scheduling loop, configuration, shutdown wiring, tests, and documentation.

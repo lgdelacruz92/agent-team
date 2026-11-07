@@ -2,7 +2,7 @@
 
 Estimated reading time: 4 minutes (150 WPM)
 
-Standalone TypeScript Express app with SQLite persistence and Kanban ticket fetching. `index.ts` calls `Scheduler.runOnce()` once at startup; unfinished dependency methods throw explicit errors. No working assignment or worker dispatch yet. The existing `frontend-ctr` stays separate.
+Standalone TypeScript Express app with SQLite persistence and Kanban ticket fetching. `index.ts` runs `Scheduler.runOnce()` continuously; unfinished dependency methods throw explicit errors. No working assignment or worker dispatch yet. The existing `frontend-ctr` stays separate.
 
 ## Run
 
@@ -22,6 +22,7 @@ Defaults to `http://127.0.0.1:3300`. No authentication: keep it local.
 - `HOST`: default `127.0.0.1`.
 - `PORT`: default `3300`.
 - `SCHEDULER_DB_PATH`: default `data/scheduler.sqlite`, relative to the working directory.
+- `SCHEDULER_POLL_MS`: wait after each completed pass, default `30000` (30 seconds). Must be an integer from 1 through 2147483647.
 - `VIKUNJA_URL`: required server URL, without `/api/v1`.
 - `VIKUNJA_API_TOKEN`: required API token.
 - `VIKUNJA_PROJECT_ID`: required positive project ID.
@@ -55,7 +56,9 @@ npm start
 
 ## Kanban ticket fetching
 
-`src/components/vikunja.ts` reads one existing Kanban board. `index.ts` constructs the components from environment settings and starts one pass after the HTTP server begins listening. A failed pass is logged; HTTP endpoints remain available. There is no polling loop. Shutdown waits for the pass before closing SQLite.
+`src/components/vikunja.ts` reads one existing Kanban board. `index.ts` constructs the components from environment settings and starts `runSchedulerLoop` after the HTTP server begins listening. The first pass starts immediately; after every pass, the loop waits `SCHEDULER_POLL_MS` and repeats. Passes never overlap. Errors are logged and retried after the same wait; HTTP endpoints remain available.
+
+SIGINT or SIGTERM stops the loop and cancels its polling wait. An active pass finishes before either SQLite connection closes. `Scheduler.runOnce()` remains one pass; repetition lives in `src/scheduler-loop.ts`.
 
 `saveTicket`, `createAssignment`, `assignTicket`, and `markInProgress` are throwing placeholders, not real implementations. With any fetched cards, the pass currently fails at `saveTicket`; it does not persist or assign them. Missing or invalid connection settings prevent startup.
 
@@ -111,4 +114,4 @@ SQLite generates local IDs. IDs use JavaScript numbers within the safe integer r
 
 Foreign keys prevent orphan assignments and deletion of referenced tickets or agents. Delete assignments explicitly first. The stores do not impose scheduling rules.
 
-The existing HTTP endpoints still use `StateStore` for generic JSON state. The startup pass uses a separate shared connection for domain stores; those stores still have no HTTP routes.
+The existing HTTP endpoints still use `StateStore` for generic JSON state. The scheduling loop uses a separate shared connection for domain stores; those stores still have no HTTP routes.
