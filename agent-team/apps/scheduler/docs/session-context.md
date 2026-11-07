@@ -1,6 +1,6 @@
 # Scheduler session context
 
-Estimated reading time: 12 minutes (150 WPM)
+Estimated reading time: 14 minutes (150 WPM)
 
 ## Purpose
 
@@ -99,3 +99,17 @@ The user then added the project goal and requested another commit.
 - Existing dependency placeholders remain untouched; continuous scheduling still logs their explicit failures until the real methods are implemented.
 - Added loop tests for repetition, error recovery, non-overlap, aborting the wait, and waiting for active work. Updated the real-entry-point test to verify repeated failed passes against a local fake board and clean shutdown. All 40 tests, application/new-test-file typechecks, and build passed. README reflects continuous operation.
 - The user requested committing the continuous scheduling loop, configuration, shutdown wiring, tests, and documentation.
+
+## Loop-test debugging
+
+- The user wants to step through scheduler loop tests in VS Code to understand the loop.
+- Added `Scheduler: debug loop tests` to the repository-root `.vscode/launch.json`, preserving the frontend controller's Docker attach configuration. Launches Node with `tsx` and the test runner, targets `test/scheduler-loop.test.ts`, and automatically attaches to test child processes.
+- This launch sets `SCHEDULER_TEST_DEBUG=1`. Loop tests omit their two-second timeouts only when that flag is set, so breakpoint pauses do not fail them. Ordinary test runs retain their timeouts.
+- Useful starting breakpoints: the first test's `await runSchedulerLoop(...)`, its fake `runOnce`, and `src/scheduler-loop.ts` at `await scheduler.runOnce()`.
+- Verified all 40 tests pass normally, and all four loop tests pass with the debug launch's command and environment. VS Code breakpoint attachment was not exercised here.
+
+## Loop walkthrough
+
+- Explained that the promise-based `setImmediate()` yields to Node's event loop rather than waiting for a fixed polling delay.
+- The user requested a Mermaid decision flowchart and a source snippet explaining every line of the scheduling loop.
+- Added `docs/scheduler-loop.md` with the flowchart, current source, source-line explanations, shutdown and error paths, and a guide to stepping through the first loop test. No loop behavior changed.

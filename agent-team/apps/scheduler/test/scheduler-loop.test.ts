@@ -4,13 +4,16 @@ import { setImmediate } from "node:timers/promises"
 import { test } from "node:test"
 import { runSchedulerLoop } from "../src/scheduler-loop.js"
 
+// Let breakpoint pauses take as long as needed; normal test runs keep their timeout.
+const testTimeout = process.env.SCHEDULER_TEST_DEBUG === "1" ? undefined : 2000
+
 function deferred() {
   let resolve!: () => void
   const promise = new Promise<void>((done) => { resolve = done })
   return { promise, resolve }
 }
 
-test("the loop repeats successful and failed passes without overlapping", { timeout: 2000 }, async () => {
+test("the loop repeats successful and failed passes without overlapping", { timeout: testTimeout }, async () => {
   const controller = new AbortController()
   const error = new Error("Pass failed")
   const errors: unknown[] = []
@@ -37,7 +40,7 @@ test("the loop repeats successful and failed passes without overlapping", { time
   assert.deepEqual(errors, [error])
 })
 
-test("aborting the polling wait stops promptly instead of waiting for the next interval", { timeout: 2000 }, async () => {
+test("aborting the polling wait stops promptly instead of waiting for the next interval", { timeout: testTimeout }, async () => {
   const controller = new AbortController()
   const called = deferred()
   let calls = 0
@@ -55,7 +58,7 @@ test("aborting the polling wait stops promptly instead of waiting for the next i
   assert.equal(calls, 1)
 })
 
-test("shutdown waits for an active pass and does not start another", { timeout: 2000 }, async () => {
+test("shutdown waits for an active pass and does not start another", { timeout: testTimeout }, async () => {
   const controller = new AbortController()
   const started = deferred()
   const finish = deferred()

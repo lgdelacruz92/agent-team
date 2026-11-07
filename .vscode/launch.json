@@ -1,0 +1,34 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // Attach to the controller running in the opencode-frontend-ctr container (port 9229 in docker-compose.yaml).
+      // Rebuild after code changes: docker compose up -d --build frontend-ctr
+      "name": "Attach to frontend-ctr (docker)",
+      "type": "node",
+      "request": "attach",
+      "address": "localhost",
+      "port": 9229,
+      "localRoot": "${workspaceFolder}/agent-team/apps/frontend-ctr",
+      "remoteRoot": "/app",
+      "sourceMaps": true,
+      "restart": true,
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Scheduler: debug loop tests",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/agent-team/apps/scheduler",
+      "runtimeArgs": ["--import", "tsx", "--test", "--test-concurrency=1"],
+      "program": "${workspaceFolder}/agent-team/apps/scheduler/test/scheduler-loop.test.ts",
+      "env": {
+        "SCHEDULER_TEST_DEBUG": "1"
+      },
+      "autoAttachChildProcesses": true,
+      "sourceMaps": true,
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    }
+  ]
+}
