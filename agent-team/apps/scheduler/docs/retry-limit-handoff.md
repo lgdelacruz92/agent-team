@@ -1,6 +1,8 @@
 # Ticket Scheduler: attempt limit and flagged tickets handoff
 
-Estimated reading time: 5 minutes (150 WPM)
+Estimated reading time: 6 minutes (150 WPM)
+
+**Historical handoff:** Some questions below have since been decided. Use [open-discussion.md](open-discussion.md), [missing-features.md](missing-features.md), and the [Resource Manager data design](../../agent-resource-manager/docs/data.md) for the current direction and remaining work.
 
 ## Purpose
 

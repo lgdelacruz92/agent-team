@@ -82,7 +82,7 @@ sequenceDiagram
         else Agent is too slow or unreachable
             RM->>V: Move card to Retry
         end
-        Note over S,RM: Completion and retry-limit coordination are not designed.<br/>An overlapping scheduler fetch can write stale status.
+        Note over S,RM: Shared lock scope agreed<br/>completion and retry-limit protocol details remain
         alt Safe completion protocol satisfied
             RM->>DB: Complete assignment and report actual agent availability
         else Safety cannot be established
@@ -111,7 +111,7 @@ Dark blue groups are outside the Resource Manager app. The diagram shows logical
 - Poll every agent each tick. The Resource Manager decides the outcome: idle and ready means success; too slow or unreachable means failure.
 - On failure, try to stop the session, but allow a retry even if the stop cannot be confirmed. Flag unreachable agents for human review and use another available agent.
 - The Ticket Scheduler checks the attempt limit and moves exhausted tickets to `Flagged tickets`. The first attempt counts as 1.
-- Use a shared database lock to coordinate scheduler passes and assignment completion. Flag potentially stale locks for human review, rather than clearing them automatically.
+- Use a shared database lock: the Ticket Scheduler holds it across board fetch, sync, and scheduling; the Resource Manager holds it across the final card move and assignment completion. Flag potentially stale locks for human review, rather than clearing them automatically.
 - Assume humans do not manually move cards. No special Resource Manager behavior for manual moves is needed; the user expects the Ticket Scheduler to flag data inconsistencies appropriately.
 
 ## Values and details to work out
