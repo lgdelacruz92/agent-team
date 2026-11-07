@@ -6,6 +6,8 @@ Estimated reading time: 2 minutes (150 WPM)
 
 The user is developing `scheduler/` as version 2 of the ticket scheduler. Its goal is to schedule Vikunja tickets to OpenCode agents. The user is unhappy with `frontend-ctr` because its implementation is difficult to follow; the new scheduler should be easier to understand.
 
+The user also hopes the scheduling system can serve as a blueprint for many applications. The project goal is recorded in `docs/project.md`.
+
 ## Current state
 
 - `scheduler/` is a standalone TypeScript and Express scaffold with SQLite persistence.
@@ -21,3 +23,4 @@ The user is developing `scheduler/` as version 2 of the ticket scheduler. Its go
 Focus this session on `scheduler/`. After each user prompt, update notes in `scheduler/docs/` with relevant conversation context and where the project stands, in addition to carrying out the requested work. Treat `frontend-ctr` as reference, not a design to copy automatically.
 
 The user requested that all current changes be committed.
+The user then added the project goal and requested another commit.
