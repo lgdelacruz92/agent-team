@@ -1,16 +1,17 @@
 # Agent resource manager session context
 
-Estimated reading time: 22 minutes (150 WPM)
+Estimated reading time: 24 minutes (150 WPM)
 
 ## Working agreement
 
 - After each user prompt, update these notes with relevant context, decisions, and project status alongside the requested work.
 - Favor understandable code over development speed; keep the system practical for common cases with a human monitoring it.
+- Use **open** only for topics not yet discussed. A decided direction, a decision explicitly deferred, or an implementation detail with an agreed direction is not open; label those separately.
 
 ## Where we left off
 
 - **Ready to begin initial implementation.** Before starting, remind the user to begin by modelling the interfaces of the entities in this app.
-- The user decided the manager will fetch the full ticket description from Vikunja and send it to the agent. The scheduler's ticket table stores the title but not the description. If fetching fails, keep the assignment reserved, retry, alert a human if the failure persists, and do not count it as an agent attempt. Other payload details and the alert threshold remain open.
+- The user decided the manager will fetch the full ticket description from Vikunja and send it to the agent. The scheduler's ticket table stores the title but not the description. If fetching fails, keep the assignment reserved, retry, alert a human if the failure persists, and do not count it as an agent attempt. Other payload details and the alert threshold remain to be worked out.
 - Remaining A1 topics: identify and recover OpenCode sessions after uncertain starts or restarts; determine evidence of success, failure, and availability; and prevent another controller from dispatching to the same worker concurrently. Inspect the real OpenCode API and existing frontend controller rather than assuming their behavior.
 - Build iteratively, starting with entity interfaces. Session tracking, shared database-lock coordination, and Ticket Scheduler changes remain necessary before real automatic dispatch and release. The attempt timeout and maximum attempts remain unset. No real agents or infrastructure were started or changed in this session.
 - Decisions so far: keep numeric `agents.id` and add a URL field for the containerized OpenCode server; user favors an `executions` table for debugging; the Resource Manager polls every agent each tick and is final authority on outcomes. An agent that stops processing and is ready for the next task means the attempt succeeded; no task criteria or results are verified. Too slow or unreachable means failed. Successful work goes to Vikunja `Done`, and failed work goes to `Retry`. The Ticket Scheduler checks the attempt limit and moves tickets at the limit to `Flagged tickets`; the first attempt counts as 1. For a failed attempt, the manager tries to stop the session but permits a new session even if stopping cannot be confirmed. The user accepts possible overlap and plans a separate session-cleanup cronjob. The attempt limit, timeout, agent availability, and completion protocol remain open. The user will redo conflicting agent instructions later.
@@ -84,3 +85,8 @@ Estimated reading time: 22 minutes (150 WPM)
 - User asked whether enough is decided to begin an initial implementation. A controlled first slice with fake agents and Vikunja is feasible; real automatic dispatch and release still depend on execution/session tracking, database lock coordination, and the separate Ticket Scheduler changes. The attempt timeout and maximum total attempts remain unset. Existing `frontend-ctr` uses a configurable 60-minute run budget, which is reference context rather than a decision for this app. No implementation was requested yet.
 - User confirmed readiness to start implementation and explicitly asked the next agent to remind them to start by modelling the app's entity interfaces. This prompt requested a note, not implementation.
 - User requested a commit of the resource manager design, session notes, sequence diagram, and related Ticket Scheduler handoff updates.
+- User asked whether the questions in `docs/sequence-diagram.md` are still open. The broad directions for outcomes, retries, task descriptions, and a database-backed coordination lock are decided, but the listed implementation details and thresholds remain unresolved. An initial implementation can still begin with entity interfaces and controlled dependencies.
+- User clarified that the word “open” was confusing because these topics have already been discussed. Distinguish decided direction that still needs implementation, deferred decisions such as the attempt limit and stale-lock warning threshold, and implementation details that can be worked out during development; do not present every item as an undiscussed question.
+- User defined **open** to mean a topic not yet discussed. Decisions, including decisions to defer, and implementation details with an agreed direction must not be called open. Updated the sequence diagram to separate agreed directions, details to work out, and the undiscussed manual-card-move topic.
+- User decided to assume humans do not manually move Vikunja cards and not add Resource Manager handling for that case. User expects the Ticket Scheduler to flag data inconsistencies appropriately. Existing code logs invalid Vikunja responses and warnings for long-waiting or invalid-timestamp assignments, but general inconsistency detection was not established; do not claim broader coverage without verification. Removed the manual-move question from the sequence diagram's undiscussed topics.
+- User requested a commit of the updated terminology, sequence diagram, and manual-board-move assumption.

@@ -32,7 +32,9 @@ These are boundaries, not a requirement to build all of them at once. How code a
 
 If fetching the task description before a new start fails, keep the assignment reserved, retry the fetch, and alert a human if the failure persists. Do not count the fetch failure as an agent attempt; no new work was started.
 
-If an agent is unreachable, mark it unavailable and flag it for human review. When a failed attempt can be retried under the Ticket Scheduler's limit, use another available agent. How flags are represented and cleared remains open.
+If an agent is unreachable, mark it unavailable and flag it for human review. When a failed attempt can be retried under the Ticket Scheduler's limit, use another available agent. How flags are represented and cleared remains to be determined.
+
+Assume humans do not manually move cards; no special manager behavior is needed for manual board changes. The user expects the Ticket Scheduler to flag data inconsistencies appropriately. Its existing checks should not be assumed to cover every possible inconsistency without verification.
 
 The current schema permits status strings but does not enforce a state machine. `running`, `completed`, and `failed` are possible labels, not an approved contract.
 
@@ -56,11 +58,11 @@ The current schema permits status strings but does not enforce a state machine. 
 
 The next useful step is **A1**: inspect the actual agent runtime and how a real agent ID maps to it. Then review the lifecycle together before building the app.
 
-## Decisions still open
+## Details to work out
 
-1. What is a real agent in this setup, and what API can start and inspect its work?
+1. Which OpenCode API operations will start and inspect work on the containerized agent servers?
 2. What ticket information and instructions besides the Vikunja description must the agent receive, and where are they stored?
 3. How do we identify a started execution and detect that its agent is ready after completion or a restart?
 4. Which statuses, failure outcomes, and card moves do we want?
 5. How will we enforce one active manager and prevent scheduler completion races?
-6. How should missing cards, manually moved cards, and older assignments be handled?
+6. How should missing cards and older assignments be handled?

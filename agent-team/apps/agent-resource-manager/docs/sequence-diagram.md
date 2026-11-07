@@ -1,6 +1,6 @@
 # Agent resource manager: initial sequence diagram
 
-Estimated reading time: 2 minutes (150 WPM)
+Estimated reading time: 3 minutes (150 WPM)
 
 **Draft:** This is a proposed flow, not implemented behavior or an approved lifecycle. It will change as we resolve the open questions.
 
@@ -28,11 +28,11 @@ sequenceDiagram
     S->>V: Fetch board tickets
     V-->>S: Tickets and column statuses
     S->>DB: Sync tickets and reserve an eligible assignment
-    Note over S,DB: Proposed attempt-limit check applies to Retry tickets
+    Note over S,DB: Attempt-limit check applies to Retry tickets
     Note over DB: Incomplete assignment reserves ticket and agent
 
     RM->>DB: Read incomplete assignment, ticket, and agent
-    Note over RM,DB: Proposed: agent URL and execution history<br/>are not in the current schema
+    Note over RM,DB: Agent URL and execution history<br/>are not in the current schema
     RM->>A: Check for existing work / actual state
     alt Safe to start
         RM->>V: Fetch task by vikunja_task_id
@@ -101,15 +101,26 @@ sequenceDiagram
 
 The diagram shows logical interactions, not a promise that every action occurs in one pass. Retries, restarts, and failures may span multiple passes.
 
-## Questions to resolve
+## Discussed: directions to implement
 
-- What else belongs in the work payload? When should a persistent task-fetch failure trigger an alert?
-- How does the manager identify existing OpenCode sessions and recover after an uncertain start or restart?
-- How do we recognize startup and readiness for the correct execution? How do we prevent competing controllers from dispatching work?
-- What does an execution record contain, and which statuses and transitions do we want?
-- What is the attempt limit, how are attempts identified in execution records, and how should a flagged ticket be handled? How do we prevent further retries at the limit?
-- How long is too long, and how is the timeout measured? What happens if no replacement agent is available?
-- How should card-move failures and manual card changes be handled?
-- How do we enforce one active manager and safely complete assignments despite overlapping scheduler fetches?
+- Fetch the full Vikunja description before starting work. If the fetch fails, keep the assignment reserved, retry, and alert a human if the failure persists.
+- Poll every agent each tick. The Resource Manager decides the outcome: idle and ready means success; too slow or unreachable means failure.
+- On failure, try to stop the session, but allow a retry even if the stop cannot be confirmed. Flag unreachable agents for human review and use another available agent.
+- The Ticket Scheduler checks the attempt limit and moves exhausted tickets to `Flagged tickets`. The first attempt counts as 1.
+- Use a shared database lock to coordinate scheduler passes and assignment completion. Flag potentially stale locks for human review, rather than clearing them automatically.
+- Assume humans do not manually move cards. No special Resource Manager behavior for manual moves is needed; the user expects the Ticket Scheduler to flag data inconsistencies appropriately.
+
+## Values and details to work out
+
+- Agent timeout, attempt limit, and when persistent task-fetch failures trigger an alert.
+- Stale-lock warning threshold and human recovery steps, explicitly deferred for later.
+- Execution-record fields, session identification, startup and restart recovery, and readiness detection for the correct execution.
+- Lock protocol and coordination with other controllers, card-move failures, and how humans clear agent or ticket flags.
+
+These are discussed topics, not necessarily new questions for the user. Work through implementation details as we build, and revisit deferred decisions when needed.
+
+## Open: not yet discussed
+
+No undiscussed topics are currently listed.
 
 See the [proposal](proposal.md), [flowchart](flowchart.md), and [session context](session-context.md) for background. The [Ticket Scheduler change handoff](../../scheduler/docs/retry-limit-handoff.md) describes the agreed responsibility split.
