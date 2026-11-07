@@ -1,6 +1,6 @@
 # Scheduler session context
 
-Estimated reading time: 21 minutes (150 WPM)
+Estimated reading time: 23 minutes (150 WPM)
 
 ## Purpose
 
@@ -157,3 +157,12 @@ The user then added the project goal and requested another commit.
 - The user requested warnings for assignments stuck in `assigned`, without a new database column or automatic release. The scheduler checks before each pass, defaults to a 10-minute threshold, and repeats warnings no more often than the same configurable interval. Warnings include assignment, ticket, and agent IDs and waiting time; they do not prove failure or block other work.
 - The user requested a scheduler status endpoint in addition to process liveness. `/status` reports whether a scheduling pass is running, the last success and failure times, and the last completed result. It resets on restart; a successful pass does not imply work was assigned or the watcher is healthy.
 - The user created `apps/agent-resource-manager/` and requested a handoff for a future agent. Its README points to `docs/agent-resource-manager.md`, which compiles the agreed boundaries, scheduler behavior, manual testing, and unresolved watcher design questions.
+
+## Ticket Scheduler session
+
+- The user refers to `apps/scheduler` as the Ticket Scheduler and plans a change there. Reviewed the Resource Manager flowchart and the scheduler docs, including `docs/retry-limit-handoff.md`; the change details have not yet been specified.
+- The user confirmed the note-taking working agreement: update `scheduler/docs/` with relevant conversation context and project state after each prompt, alongside the requested work.
+- The user asked whether the retry-limit handoff is ready to implement. The responsibility split is agreed, but the limit, shared execution/counting contract, human reset behavior, failure handling, and safe cross-app coordination remain open; no implementation was authorized by this question.
+- The user wants to discuss the open retry-limit decisions one at a time, starting with the total attempt limit.
+- The user wants to finish this discussion when opening this project with another agent. The exact questions and starting point are recorded in [open-discussion.md](open-discussion.md); none has been decided yet. Continue one question at a time before implementing the complete handoff.
+- The user requested a commit of only the Ticket Scheduler updates, leaving Resource Manager changes separate.
