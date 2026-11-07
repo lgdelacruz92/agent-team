@@ -9,6 +9,8 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { test } from "node:test"
+import { openDatabase } from "../src/db/database.js"
+import { TicketStore } from "../src/db/ticket-store.js"
 
 const projectDirectory = fileURLToPath(new URL("..", import.meta.url))
 
@@ -74,7 +76,8 @@ test("index.ts continuously retries failed passes and shuts down cleanly", { tim
     child.once("exit", () => reject(new Error(`Scheduler exited before its startup pass: ${output}`)))
   })
 
-  assert.match(output, /SchedulerDatabase.saveTicket is not implemented/)
+  assert.match(output, /AgentManager.assignTicket is not implemented/)
+  assert.doesNotMatch(output, /SchedulerDatabase.saveTicket is not implemented/)
   const response = await fetch(`http://127.0.0.1:${port}/health`)
   assert.deepEqual(await response.json(), { ok: true, service: "scheduler" })
   child.kill("SIGTERM")
@@ -82,4 +85,15 @@ test("index.ts continuously retries failed passes and shuts down cleanly", { tim
   assert.equal(code, 0)
   assert.equal(signal, null)
   assert.ok(boardRequests >= 2)
+
+  // Repeated passes persist one ticket, retaining the same local ID across saves.
+  const database = openDatabase(join(directory, "scheduler.sqlite"))
+  try {
+    assert.deepEqual(new TicketStore(database).list().map((ticket) => ({ ...ticket })), [
+      { id: 1, vikunjaTaskId: 42, title: "Build a form", status: "Ready", priority: 1 },
+    ])
+    assert.equal(database.prepare("SELECT COUNT(*) AS count FROM assignments").get()?.count, 0)
+  } finally {
+    database.close()
+  }
 })

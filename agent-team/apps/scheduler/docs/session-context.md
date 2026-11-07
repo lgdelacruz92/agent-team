@@ -1,6 +1,6 @@
 # Scheduler session context
 
-Estimated reading time: 14 minutes (150 WPM)
+Estimated reading time: 15 minutes (150 WPM)
 
 ## Purpose
 
@@ -13,7 +13,7 @@ The user also hopes the scheduling system can serve as a blueprint for many appl
 - `scheduler/` is a standalone TypeScript and Express scaffold with SQLite persistence.
 - It has generic state endpoints, domain stores for tickets, agents and assignments, and interfaces for future components.
 - `Scheduler.runOnce()` orchestration and Vikunja Kanban fetching are implemented. `index.ts` constructs the components and starts a non-overlapping scheduling loop after the HTTP server starts. Worker dispatch is not implemented. `frontend-ctr` remains separate.
-- The SQLite stores and HTTP scaffold are implemented. `saveTicket`, `createAssignment`, `AgentManager.assignTicket`, and `markInProgress` are explicit throwing placeholders; real behavior remains unfinished.
+- The SQLite stores, HTTP scaffold, and `SchedulerDatabase.saveTicket` are implemented. `createAssignment`, `AgentManager.assignTicket`, and `markInProgress` remain explicit throwing placeholders; assignment and card movement are unfinished.
 - The user prefers to start with the scheduler database, thinking about the data before the scheduling workflow.
 - The first implemented method is `SchedulerDatabaseInterface.getReadyTickets`. The user initially deferred `VikunjaInterface`, then asked to implement Vikunja tickets next.
 - The ready-ticket lookup selects local tickets whose status is exactly `Ready` or `Retry`, in local ID order, without changing their stored statuses. Both statuses are conceptually ready to schedule. Dependency and priority rules are not implemented.
@@ -113,3 +113,12 @@ The user then added the project goal and requested another commit.
 - Explained that the promise-based `setImmediate()` yields to Node's event loop rather than waiting for a fixed polling delay.
 - The user requested a Mermaid decision flowchart and a source snippet explaining every line of the scheduling loop.
 - Added `docs/scheduler-loop.md` with the flowchart, current source, source-line explanations, shutdown and error paths, and a guide to stepping through the first loop test. No loop behavior changed.
+
+## saveTicket implementation
+
+- The user requested implementing only `SchedulerDatabase.saveTicket`.
+- Uses the existing TicketStore: look up the Vikunja task ID, create if missing, otherwise update the existing local ID. Copies title, status, and priority exactly; repeated saves do not create duplicates. No deletion of missing board cards, readiness normalization, or priority policy was added.
+- Database errors propagate. If an update unexpectedly returns no ticket, the method rejects rather than reporting success. Store calls are synchronous, with no await between lookup and write; this is not a cross-process atomic upsert.
+- Assignment creation, agent assignment, and Vikunja movement remain throwing placeholders. A pass now saves fetched cards and, if Ready or Retry tickets exist, fails at `AgentManager.assignTicket`.
+- Added tests for creation, updates preserving local identity and unrelated tickets, repeated saves, and database failures. Updated placeholder and startup tests; the startup test verifies repeated passes persist one ticket across shutdown and create no assignments. All requests use a local fake board, not the user's server.
+- Verification: all 44 tests passed, application and changed-test-file typechecks passed, and build passed. README and current-state notes reflect ticket persistence.

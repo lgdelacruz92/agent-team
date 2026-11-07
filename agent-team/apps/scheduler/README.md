@@ -1,6 +1,6 @@
 # Scheduler v2 scaffold
 
-Estimated reading time: 4 minutes (150 WPM)
+Estimated reading time: 5 minutes (150 WPM)
 
 Standalone TypeScript Express app with SQLite persistence and Kanban ticket fetching. `index.ts` runs `Scheduler.runOnce()` continuously; unfinished dependency methods throw explicit errors. No working assignment or worker dispatch yet. The existing `frontend-ctr` stays separate.
 
@@ -60,7 +60,9 @@ npm start
 
 SIGINT or SIGTERM stops the loop and cancels its polling wait. An active pass finishes before either SQLite connection closes. `Scheduler.runOnce()` remains one pass; repetition lives in `src/scheduler-loop.ts`.
 
-`saveTicket`, `createAssignment`, `assignTicket`, and `markInProgress` are throwing placeholders, not real implementations. With any fetched cards, the pass currently fails at `saveTicket`; it does not persist or assign them. Missing or invalid connection settings prevent startup.
+`SchedulerDatabase.saveTicket()` creates or updates each fetched ticket by its Vikunja task ID, preserving its local ID and copying title, status, and priority exactly. Repeated saves do not create duplicates. Tickets absent from a fetch are not deleted.
+
+`createAssignment`, `assignTicket`, and `markInProgress` remain throwing placeholders. With a local Ready or Retry ticket, the pass now fails at `assignTicket` after saving fetched cards; no real assignment or dispatch occurs. Missing or invalid connection settings prevent startup.
 
 For direct use, supply connection settings explicitly:
 

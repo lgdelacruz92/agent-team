@@ -7,8 +7,20 @@ import type { VikunjaTicket } from "../interfaces/vikunja.interface.js"
 export class SchedulerDatabase implements SchedulerDatabaseInterface {
   constructor(private readonly tickets: TicketStore) {}
 
-  async saveTicket(_ticket: VikunjaTicket): Promise<SchedulerTicket> {
-    throw new Error("SchedulerDatabase.saveTicket is not implemented")
+  async saveTicket(ticket: VikunjaTicket): Promise<SchedulerTicket> {
+    const existingTicket = this.tickets.getByVikunjaTaskId(ticket.vikunjaTaskId)
+
+    if (!existingTicket) {
+      return this.tickets.create(ticket)
+    }
+
+    const savedTicket = this.tickets.update(existingTicket.id, ticket)
+
+    if (!savedTicket) {
+      throw new Error(`Ticket ${existingTicket.id} no longer exists`)
+    }
+
+    return savedTicket
   }
 
   async createAssignment(_assignment: NewAssignment): Promise<Assignment> {

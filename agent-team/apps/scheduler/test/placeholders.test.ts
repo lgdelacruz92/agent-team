@@ -9,12 +9,11 @@ import { TicketStore } from "../src/db/ticket-store.js"
 
 const ticket = { vikunjaTaskId: 42, title: "Build a form", status: "Ready", priority: 1 }
 
-test("SchedulerDatabase placeholders throw without writing tickets or assignments", async () => {
+test("SchedulerDatabase createAssignment placeholder throws without writing tickets or assignments", async () => {
   const database = openDatabase(":memory:")
   try {
     const tickets = new TicketStore(database)
     const schedulerDatabase = new SchedulerDatabase(tickets)
-    await assert.rejects(schedulerDatabase.saveTicket(ticket), /saveTicket is not implemented/)
     await assert.rejects(schedulerDatabase.createAssignment({
       ticketId: 1, agentId: 1, assignmentStatus: "running", ticketStatus: "In progress", assignedAt: "2026-11-06T12:00:00.000Z",
     }), /createAssignment is not implemented/)
