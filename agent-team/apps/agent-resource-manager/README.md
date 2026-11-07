@@ -2,7 +2,16 @@
 
 Estimated reading time: 1 minute (150 WPM)
 
-This folder is reserved for a future app that watches scheduler assignments and reconciles real agent resources. It has no implementation yet.
+This app will watch Ticket Scheduler assignments and reconcile real agent resources. Its initial process loop runs, but it does not load a Resource Manager or perform any work yet.
+
+## Run
+
+```sh
+npm install
+npm run dev
+```
+
+The loop logs that it is idle every 30 seconds. Stop it with Ctrl+C. To run the compiled app, use `npm run build` followed by `npm start`.
 
 **Start here:** read the [scheduler handoff](../scheduler/docs/agent-resource-manager.md) for the agreed responsibilities, current database behavior, example lifecycle, and decisions still open. Then check the linked scheduler source before designing an integration.
 

@@ -1,6 +1,6 @@
 # Agent resource manager session context
 
-Estimated reading time: 26 minutes (150 WPM)
+Estimated reading time: 28 minutes (150 WPM)
 
 ## Working agreement
 
@@ -10,7 +10,7 @@ Estimated reading time: 26 minutes (150 WPM)
 
 ## Where we left off
 
-- **Ready to begin initial implementation.** Before starting, remind the user to begin by modelling the interfaces of the entities in this app.
+- **Initial app started.** `src/interfaces/resource-manager.interface.ts` defines one reconciliation pass. `src/index.ts` starts an idle process loop without creating a Resource Manager. The Resource Manager class and its reconciliation behavior are not implemented yet. Continue modelling the app's entity interfaces.
 - The user decided the manager will fetch the full ticket description from Vikunja and send it to the agent. The scheduler's ticket table stores the title but not the description. If fetching fails, keep the assignment reserved, retry, alert a human if the failure persists, and do not count it as an agent attempt. Other payload details and the alert threshold remain to be worked out.
 - Remaining A1 topics: identify and recover OpenCode sessions after uncertain starts or restarts; determine evidence of success, failure, and availability; and prevent another controller from dispatching to the same worker concurrently. Inspect the real OpenCode API and existing frontend controller rather than assuming their behavior.
 - Build iteratively, starting with entity interfaces. Session tracking, shared database-lock coordination, and Ticket Scheduler changes remain necessary before real automatic dispatch and release. The attempt timeout and maximum attempts remain unset. No real agents or infrastructure were started or changed in this session.
@@ -18,7 +18,7 @@ Estimated reading time: 26 minutes (150 WPM)
 
 ## Current state
 
-- The app has not been implemented. No agent startup or infrastructure changes have been requested.
+- The app has a runnable idle process loop, but no Resource Manager implementation or integrations. No agent startup or infrastructure changes have been requested.
 - Read the [scheduler handoff](../../scheduler/docs/agent-resource-manager.md) for agreed boundaries, current behavior, and open design questions. Check the linked source before designing an integration.
 - The scheduler records assignments in shared SQLite. An incomplete assignment reserves its ticket and agent; it does not prove work has started.
 - The intended manager will reconcile real agent state, report progress, and move Vikunja cards. Lifecycle, recovery, and completion coordination remain undecided.
@@ -99,3 +99,8 @@ Estimated reading time: 26 minutes (150 WPM)
 - User clarified that the coloring request was for the sequence diagram, but asked to keep the flowchart coloring too. Grouped external sequence participants in blue, including the human monitor, while leaving the Resource Manager outside the groups.
 - User found the sequence diagram's light blue hard to read and requested dark blue. Changed the external groups to dark blue and moved their label to the legend to avoid low-contrast text on the dark background.
 - User requested a commit of the session's Resource Manager documentation changes.
+- User wants to start with interfaces and asked where they should live. The sibling apps put interfaces in `src/interfaces/`; `frontend-ctr/src/codingstandards.md` explicitly directs type and interface definitions there. Await confirmation that this convention applies to the Resource Manager before creating files.
+- User confirmed `src/interfaces/` and requested only the Resource Manager app interface to start. They want its class separate from the entrypoint and runner: `index.ts` can initialize it, while the runner controls repetition. Added `ResourceManagerInterface.runOnce()` for one reconciliation pass, following the Ticket Scheduler's pattern. No runner, class, package setup, or execution was added.
+- User requested `src/index.ts`. Added an entrypoint placeholder for future initialization and runner wiring; the class, dependencies, runner, and npm scripts do not exist yet.
+- User clarified they wanted an initial app whose `npm run dev` starts a process loop, without loading a Resource Manager object. Added a TypeScript app, entrypoint, separate idle loop, and npm scripts. The loop logs immediately and every 30 seconds until Ctrl+C; it does not connect to agents, Vikunja, or SQLite. The 30-second idle interval is a starter value, not a decision on the eventual reconciliation interval. Installed dependencies, passed typecheck and build, and verified the dev process starts and stops.
+- User requested a commit of the initial app. Added local ignore exceptions for `tsconfig.json` and `package-lock.json` so the repo's broad JSON ignore rule does not omit them.
