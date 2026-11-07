@@ -1,6 +1,6 @@
 # Agent resource manager session context
 
-Estimated reading time: 28 minutes (150 WPM)
+Estimated reading time: 29 minutes (150 WPM)
 
 ## Working agreement
 
@@ -104,3 +104,7 @@ Estimated reading time: 28 minutes (150 WPM)
 - User requested `src/index.ts`. Added an entrypoint placeholder for future initialization and runner wiring; the class, dependencies, runner, and npm scripts do not exist yet.
 - User clarified they wanted an initial app whose `npm run dev` starts a process loop, without loading a Resource Manager object. Added a TypeScript app, entrypoint, separate idle loop, and npm scripts. The loop logs immediately and every 30 seconds until Ctrl+C; it does not connect to agents, Vikunja, or SQLite. The 30-second idle interval is a starter value, not a decision on the eventual reconciliation interval. Installed dependencies, passed typecheck and build, and verified the dev process starts and stops.
 - User requested a commit of the initial app. Added local ignore exceptions for `tsconfig.json` and `package-lock.json` so the repo's broad JSON ignore rule does not omit them.
+- User asked whether the Resource Manager queries the Ticket Scheduler directly. The proposed design has no direct scheduler API queries: the manager reads assignments, tickets, and agents from shared SQLite and communicates separately with Vikunja and OpenCode. Integration remains unimplemented.
+- User confirmed the Resource Manager's three planned system integrations: Vikunja, shared SQLite, and OpenCode agents. The diagram also includes a human monitor for alerts; the alert delivery mechanism has not been decided.
+- User asked whether those integrations need interfaces. Discussed a separate interface for each integration so the Resource Manager depends on the operations it needs; exact methods and any further split remain to be designed. No integration interfaces have been created yet.
+- User requested the three integration interfaces. Added initial Vikunja, shared-database, and OpenCode agent contracts under `src/interfaces/`. They cover the agreed basic operations without implementing integrations or settling execution records, session recovery, the shared-lock protocol, alerting, or lifecycle details. The proposed agent URL is nullable because the existing schema does not yet store it.

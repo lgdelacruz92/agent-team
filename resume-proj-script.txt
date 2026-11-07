@@ -1,0 +1,1 @@
+read this folder. pay attention to agent-resource-manager, that is what we will be working on in this session. pay attention to the docs it will contain notes of where we left off. It will also mention how I like to take notes on the project so I can pause this project to come back to it later.
