@@ -40,7 +40,7 @@ test("assignTicket chooses the first idle agent, skipping offline, busy, and res
     assert.equal(saved.completedAt, null)
     assert.ok(Date.parse(saved.assignedAt) >= before && Date.parse(saved.assignedAt) <= Date.now())
     assert.equal(context.tickets.get(context.ticket.id)?.status, "In progress")
-    assert.equal(context.agents.get(firstFree.id)?.status, "busy")
+    assert.equal(context.agents.get(firstFree.id)?.status, "idle")
     assert.equal(context.agents.get(secondFree.id)?.status, "idle")
   } finally {
     context.database.close()
@@ -63,9 +63,10 @@ test("assignTicket returns null without changing state when no agent is availabl
 test("assignTicket accepts Retry and does not reserve one agent for two tickets", async () => {
   const context = setup()
   try {
-    context.agents.create({ name: "frontend", status: "idle" })
+    const agent = context.agents.create({ name: "frontend", status: "idle" })
     const retry = context.tickets.create({ ...context.ticket, vikunjaTaskId: 43, status: "Retry" })
     assert.ok(await context.manager.assignTicket(retry))
+    assert.equal(context.agents.get(agent.id)?.status, "idle")
     assert.equal(await context.manager.assignTicket(context.ticket), null)
     assert.equal(context.assignments.list().length, 1)
   } finally {

@@ -1,6 +1,6 @@
 # Scheduler session context
 
-Estimated reading time: 18 minutes (150 WPM)
+Estimated reading time: 19 minutes (150 WPM)
 
 ## Purpose
 
@@ -11,10 +11,10 @@ The user also hopes the scheduling system can serve as a blueprint for many appl
 ## Current state
 
 - `scheduler/` is a standalone TypeScript and Express scaffold with SQLite persistence.
-- It has generic state endpoints, domain stores for tickets, agents and assignments, and interfaces for future components.
+- It has a health endpoint, domain stores for tickets, agents and assignments, and interfaces for future components. The generic state store and endpoints were removed.
 - `Scheduler.runOnce()` orchestration and Vikunja Kanban fetching are implemented. `index.ts` constructs the components and starts a non-overlapping scheduling loop after the HTTP server starts. Worker dispatch is not implemented. `frontend-ctr` remains separate.
 - The SQLite stores, HTTP scaffold, ticket sync, assignment creation, local agent selection, and `Vikunja.markInProgress` are implemented. No throwing placeholders remain. Local assignment reserves an agent; OpenCode session dispatch and completion/release handling remain unfinished.
-- Agent selection uses exact status `idle` and no assignment with null `completedAt`, in local agent ID order. Assignment creation marks the agent `busy`, updates the ticket, and saves ownership atomically. Agents must be registered explicitly through AgentStore; startup does not seed agents or discover OpenCode workers.
+- Agent selection uses exact status `idle` and no assignment with null `completedAt`, in local agent ID order. Assignment creation updates the ticket and saves ownership atomically, without changing agent status. The future watcher owns reporting real agent status; an incomplete assignment prevents double booking while the agent still reports idle. Agents are prepopulated externally with real IDs; startup does not seed agents or discover OpenCode workers.
 - The user prefers to start with the scheduler database, thinking about the data before the scheduling workflow.
 - The first implemented method is `SchedulerDatabaseInterface.getReadyTickets`. The user initially deferred `VikunjaInterface`, then asked to implement Vikunja tickets next.
 - The ready-ticket lookup selects local tickets whose status is exactly `Ready` or `Retry`, in local ID order, without changing their stored statuses. Both statuses are conceptually ready to schedule. Dependency and priority rules are not implemented.
@@ -139,4 +139,8 @@ The user then added the project goal and requested another commit.
 ## External agent synchronizer proposal
 
 - The user says agent IDs will be pre-populated and can be assumed to correspond to real agents. A separate app will watch the database and synchronize its real agents according to table state.
-- This is a proposed integration direction; the exact contract remains to be decided, including who writes desired and observed states, how the other app starts work and reports completion or failure, and how retries avoid duplicate execution. No implementation change was requested.
+- At that point, the exact integration contract was still undecided, including state ownership, how the other app starts work and reports completion or failure, and how retries avoid duplicate execution. The later decision on agent status ownership is recorded below.
+
+## Agent status ownership
+
+- The user wants the future watcher, not the scheduler, to update `agents.status` to reflect real agents. Assignment creation leaves agent status unchanged; an incomplete assignment reserves an idle agent until completion. The existing assignment status `running` remains bookkeeping and does not confirm execution.

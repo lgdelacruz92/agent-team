@@ -1,6 +1,6 @@
 # Scheduler v2 scaffold
 
-Estimated reading time: 8 minutes (150 WPM)
+Estimated reading time: 9 minutes (150 WPM)
 
 Standalone TypeScript Express app with SQLite persistence, local agent assignment, and Vikunja Kanban card movement. `index.ts` runs `Scheduler.runOnce()` continuously. Assignment reserves a local agent; it does not start an OpenCode session. Worker dispatch and completion handling are not implemented. The existing `frontend-ctr` stays separate.
 
@@ -53,7 +53,7 @@ SIGINT or SIGTERM stops the loop and cancels its polling wait. An active pass fi
 
 `SchedulerDatabase.saveTicket()` creates or updates each fetched ticket by its Vikunja task ID, preserving its local ID and copying title, status, and priority exactly. Repeated saves do not create duplicates. Tickets absent from a fetch are not deleted.
 
-`AgentManager.assignTicket()` chooses the first idle agent in local ID order with no incomplete assignment. `SchedulerDatabase.createAssignment()` records ownership, updates the local ticket, and marks the agent busy in one SQLite transaction. The scheduler then calls `Vikunja.markInProgress()`. No agent available means no assignment and no card movement. Missing or invalid connection settings prevent startup.
+`AgentManager.assignTicket()` chooses the first idle agent in local ID order with no incomplete assignment. `SchedulerDatabase.createAssignment()` records ownership and updates the local ticket in one SQLite transaction, without changing the agent's status. The scheduler then calls `Vikunja.markInProgress()`. No agent available means no assignment and no card movement. Missing or invalid connection settings prevent startup.
 
 If card movement fails, the next pass reuses the ticket's existing incomplete assignment and retries the move instead of reserving another agent. A board refresh can temporarily reset the local ticket to Ready or Retry; it never clears the reservation. A successful later board fetch synchronizes its status.
 
@@ -99,14 +99,14 @@ Use the imports shown below. This example generates an ID locally; it does not p
 
 ### Intended watcher contract
 
-The database is intended to be the source of truth for system state. A separate app will watch the agent and assignment records and reconcile the real agent resources with the desired state. The scheduler records assignments; it does not start or monitor agents. The watcher will use `assignments.agent_id` to find the real agent by `agents.id` and report observed progress back to the database. A saved assignment alone is not proof that an agent is running.
+The database is intended to be the source of truth for system state. A separate app will watch the agent and assignment records and reconcile the real agent resources with the desired state. The scheduler records assignments; it does not start or monitor agents or update agent status. The watcher is intended to report real agent status and observed progress back to the database, using `assignments.agent_id` to find the real agent by `agents.id`. A saved assignment alone is not proof that an agent is running. An incomplete assignment reserves the agent even while its status remains `idle`.
 
 One possible future flow is for the scheduler to record `assigned`, then for the watcher to report `running` after confirming startup and `completed` or `failed` after work ends. The exact lifecycle and write ownership still need implementation. The watcher is not implemented here, and the current scheduler writes `running` immediately as described below.
 
 - `idle`: eligible, provided the agent has no assignment whose `completedAt` is null.
-- `busy`: reserved by assignment creation. Other status strings are excluded.
+- `busy`: ineligible for new assignments. The scheduler does not set this status; the future watcher is responsible for reporting agent status. Other status strings are excluded.
 - Assignment `running`: bookkeeping for active ownership, not proof that an AI worker is executing.
-- Completion: still manual through the stores. Set the assignment's completion timestamp and return the agent to idle only when its work is actually finished. Moving the board card to Done alone does not release the reservation.
+- Completion: still manual through the stores until the watcher exists. Set the assignment's completion timestamp and report the agent as idle only when its work is actually finished. Moving the board card to Done alone does not release the reservation.
 
 `SchedulerDatabase` now receives the shared SQLite connection and constructs its own stores. `AgentManager` receives the scheduler database, AgentStore, and AssignmentStore on that same connection. Transactions recheck persisted ticket readiness and agent availability and reject duplicate active ownership. Raw stores remain low-level CRUD and can bypass these scheduling rules.
 

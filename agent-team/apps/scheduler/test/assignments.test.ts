@@ -24,9 +24,13 @@ function setup() {
   return { database, tickets, agents, assignments, ticket, agent, input, schedulerDatabase: new SchedulerDatabase(database) }
 }
 
-test("createAssignment saves supplied fields, changes ticket status, and reserves the agent", async () => {
+test("createAssignment reserves the agent without updating its status", async () => {
   const context = setup()
   try {
+    context.database.exec(`
+      CREATE TRIGGER reject_agent_update BEFORE UPDATE ON agents
+      BEGIN SELECT RAISE(ABORT, 'agent status belongs to watcher'); END;
+    `)
     const saved = await context.schedulerDatabase.createAssignment(context.input)
     assert.deepEqual({ ...saved }, {
       id: saved.id,
@@ -38,7 +42,7 @@ test("createAssignment saves supplied fields, changes ticket status, and reserve
     })
     assert.deepEqual(context.assignments.get(saved.id), saved)
     assert.deepEqual({ ...context.tickets.get(context.ticket.id) }, { ...context.ticket, status: "In progress" })
-    assert.equal(context.agents.get(context.agent.id)?.status, "busy")
+    assert.deepEqual(context.agents.get(context.agent.id), context.agent)
     assert.deepEqual(await context.schedulerDatabase.getReadyTickets(), [])
   } finally {
     context.database.close()
@@ -109,7 +113,8 @@ test("createAssignment rejects an idle agent that still has an incomplete assign
   const context = setup()
   try {
     const other = context.tickets.create({ ...context.ticket, vikunjaTaskId: 43 })
-    const existing = context.assignments.create({ ticketId: other.id, agentId: context.agent.id, status: "running" })
+    const existing = await context.schedulerDatabase.createAssignment({ ...context.input, ticketId: other.id })
+    assert.equal(context.agents.get(context.agent.id)?.status, "idle")
     await assert.rejects(context.schedulerDatabase.createAssignment(context.input), /is not available/)
     assert.deepEqual(context.assignments.list(), [existing])
     assert.deepEqual(context.tickets.get(context.ticket.id), context.ticket)
@@ -136,25 +141,23 @@ test("createAssignment leaves ticket and agent unchanged if inserting the assign
   }
 })
 
-for (const table of ["tickets", "agents"]) {
-  test(`createAssignment rolls back all writes if updating ${table} fails`, async () => {
-    const context = setup()
-    try {
-      context.database.exec(`
-        CREATE TRIGGER reject_update BEFORE UPDATE ON ${table}
-        BEGIN SELECT RAISE(ABORT, 'forced update failure'); END;
-      `)
-      await assert.rejects(context.schedulerDatabase.createAssignment(context.input), /forced update failure/)
-      assert.deepEqual(context.assignments.list(), [])
-      assert.deepEqual(context.tickets.get(context.ticket.id), context.ticket)
-      assert.deepEqual(context.agents.get(context.agent.id), context.agent)
-      context.database.exec("DROP TRIGGER reject_update")
-      await context.schedulerDatabase.createAssignment(context.input)
-    } finally {
-      context.database.close()
-    }
-  })
-}
+test("createAssignment rolls back all writes if updating the ticket fails", async () => {
+  const context = setup()
+  try {
+    context.database.exec(`
+      CREATE TRIGGER reject_update BEFORE UPDATE ON tickets
+      BEGIN SELECT RAISE(ABORT, 'forced update failure'); END;
+    `)
+    await assert.rejects(context.schedulerDatabase.createAssignment(context.input), /forced update failure/)
+    assert.deepEqual(context.assignments.list(), [])
+    assert.deepEqual(context.tickets.get(context.ticket.id), context.ticket)
+    assert.deepEqual(context.agents.get(context.agent.id), context.agent)
+    context.database.exec("DROP TRIGGER reject_update")
+    await context.schedulerDatabase.createAssignment(context.input)
+  } finally {
+    context.database.close()
+  }
+})
 
 test("createAssignment allows a new attempt after the old assignment completes and the agent is idle", async () => {
   const context = setup()

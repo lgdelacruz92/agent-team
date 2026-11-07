@@ -66,10 +66,9 @@ export class SchedulerDatabase implements SchedulerDatabaseInterface {
         assignedAt: assignment.assignedAt,
       })
       const savedTicket = this.tickets.update(ticket.id, { ...ticket, status: assignment.ticketStatus })
-      const savedAgent = this.agents.update(agent.id, { name: agent.name, status: "busy" })
 
-      if (!savedTicket || !savedAgent) {
-        throw new Error("Ticket or agent disappeared while creating the assignment")
+      if (!savedTicket) {
+        throw new Error("Ticket disappeared while creating the assignment")
       }
 
       this.database.exec("COMMIT")
