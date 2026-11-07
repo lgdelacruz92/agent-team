@@ -81,6 +81,7 @@ for (const hasAgent of [false, true]) {
         PORT: String(port),
         SCHEDULER_DB_PATH: databasePath,
         SCHEDULER_POLL_MS: "20",
+        SCHEDULER_ASSIGNMENT_WARNING_MS: "5",
         VIKUNJA_URL: `http://127.0.0.1:${(board.address() as AddressInfo).port}`,
         VIKUNJA_API_TOKEN: "test-token",
         VIKUNJA_PROJECT_ID: "3",
@@ -131,6 +132,7 @@ for (const hasAgent of [false, true]) {
         assert.equal(assignments[1].ticketId, 2)
         assert.equal(assignments[1].agentId, 2)
         assert.equal(new AgentStore(database).get(1)?.status, "idle")
+        assert.match(output, /assignment 1, ticket 1, agent 1: still assigned after/)
       }
       assert.doesNotMatch(output, /scheduler pass failed:/)
     } finally {

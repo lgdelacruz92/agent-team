@@ -1,6 +1,6 @@
 # Scheduler v2 scaffold
 
-Estimated reading time: 9 minutes (150 WPM)
+Estimated reading time: 10 minutes (150 WPM)
 
 Standalone TypeScript Express app with SQLite persistence, local agent assignment, and Vikunja Kanban fetching. `index.ts` runs `Scheduler.runOnce()` continuously. Assignment reserves a local agent; it does not start an OpenCode session or move a card. The future resource manager will handle agent execution and card movement; it is not implemented. The existing `frontend-ctr` stays separate.
 
@@ -23,6 +23,7 @@ Defaults to `http://127.0.0.1:3300`. No authentication: keep it local.
 - `PORT`: default `3300`.
 - `SCHEDULER_DB_PATH`: default `data/scheduler.sqlite`, relative to the working directory.
 - `SCHEDULER_POLL_MS`: wait after each completed pass, default `30000` (30 seconds). Must be an integer from 1 through 2147483647.
+- `SCHEDULER_ASSIGNMENT_WARNING_MS`: age at which to warn about an incomplete `assigned` record, and minimum time between repeated warnings. Default `600000` (10 minutes); must be a positive safe integer.
 - `VIKUNJA_URL`: required server URL, without `/api/v1`.
 - `VIKUNJA_API_TOKEN`: required API token.
 - `VIKUNJA_PROJECT_ID`: required positive project ID.
@@ -58,6 +59,8 @@ Existing databases are migrated on startup. Previously stored tickets start with
 `AgentManager.assignTicket()` chooses the first idle agent in local ID order with no incomplete assignment. `SchedulerDatabase.createAssignment()` records ownership in a SQLite transaction, without changing the ticket or agent status. No agent available means no assignment. Missing or invalid connection settings prevent startup.
 
 An assigned ticket can remain `Ready` or `Retry` until the future resource manager moves its card. The scheduler skips any ticket with an incomplete assignment and can select another ticket on a later pass. The resource manager will move the card to `In progress` after confirming the agent has started; the next board fetch copies that status into the local ticket.
+
+Before each scheduling pass, the scheduler checks incomplete assignments still marked `assigned`. Once one reaches `SCHEDULER_ASSIGNMENT_WARNING_MS`, it logs the assignment, ticket, and agent IDs and how long it has waited. Warnings repeat no more often than that interval while it remains assigned. The check also runs when the board is unavailable. Invalid `assigned_at` timestamps produce a warning instead of silently escaping monitoring. Warning timing is checked on the polling loop, so a warning may arrive later than the configured threshold. Throttling is in memory and resets on restart. Warnings do not update records, release agents, or prove that an agent failed.
 
 For direct use, supply connection settings explicitly:
 

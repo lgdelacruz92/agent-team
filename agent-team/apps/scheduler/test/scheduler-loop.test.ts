@@ -87,3 +87,31 @@ test("an already stopped loop does not start a pass", async () => {
   controller.abort()
   await runSchedulerLoop({ async runOnce() { assert.fail("No pass should start") } }, 1, controller.signal)
 })
+
+test("assignment checks continue even when scheduling passes fail", async () => {
+  const controller = new AbortController()
+  let checks = 0
+  let passes = 0
+  const errors: unknown[] = []
+  await runSchedulerLoop({
+    async runOnce() {
+      passes += 1
+      if (passes === 2) controller.abort()
+      throw new Error("board unavailable")
+    },
+  }, 1, controller.signal, (error) => errors.push(error), () => { checks += 1 })
+  assert.equal(checks, 2)
+  assert.equal(errors.length, 2)
+})
+
+test("a failed assignment check is reported but does not stop scheduling", async () => {
+  const controller = new AbortController()
+  const errors: unknown[] = []
+  const failure = new Error("cannot inspect assignments")
+  let passes = 0
+  await runSchedulerLoop({
+    async runOnce() { passes += 1; controller.abort() },
+  }, 1, controller.signal, undefined, () => { throw failure }, (error) => errors.push(error))
+  assert.equal(passes, 1)
+  assert.deepEqual(errors, [failure])
+})

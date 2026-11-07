@@ -7,8 +7,16 @@ export async function runSchedulerLoop(
   pollMs: number,
   signal: AbortSignal,
   onError: (error: unknown) => void = (error) => console.error("scheduler pass failed:", error),
+  checkAssignments: () => void = () => {},
+  onCheckError: (error: unknown) => void = (error) => console.error("assignment warning check failed:", error),
 ): Promise<void> {
   while (!signal.aborted) {
+    try {
+      checkAssignments()
+    } catch (error) {
+      onCheckError(error)
+    }
+
     try {
       await scheduler.runOnce()
     } catch (error) {

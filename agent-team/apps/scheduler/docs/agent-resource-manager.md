@@ -29,6 +29,8 @@ When a new assignment succeeds, one SQLite transaction:
 
 An incomplete assignment reserves both the ticket and the agent even if the ticket still says `Ready` and the agent still says `idle`. The scheduler can move on to another ticket while the resource manager starts work. The reservation is based on `completed_at`, not the assignment status string.
 
+The scheduler logs a warning when an incomplete assignment stays `assigned` beyond the configured threshold. The warning does not release the agent or change any database state. The watcher should report actual progress; a long wait alone is not proof that an agent failed.
+
 For example, immediately after a successful assignment, the rows could look like:
 
 | Table | Relevant values |
