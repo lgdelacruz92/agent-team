@@ -13,6 +13,7 @@ import { AgentStore } from "../src/db/agent-store.js"
 import { AssignmentStore } from "../src/db/assignment-store.js"
 import { openDatabase } from "../src/db/database.js"
 import { TicketStore } from "../src/db/ticket-store.js"
+import { createTestDatabase } from "./fixtures/database.js"
 
 const projectDirectory = fileURLToPath(new URL("..", import.meta.url))
 
@@ -66,7 +67,7 @@ for (const hasAgent of [false, true]) {
 
     const directory = mkdtempSync(join(tmpdir(), "scheduler-startup-test-"))
     const databasePath = join(directory, "scheduler.sqlite")
-    const initialDatabase = openDatabase(databasePath)
+    const initialDatabase = createTestDatabase(databasePath)
     if (hasAgent) {
       new AgentStore(initialDatabase).create({ name: "frontend-1", status: "idle" })
       new AgentStore(initialDatabase).create({ name: "frontend-2", status: "idle" })

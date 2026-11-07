@@ -1,6 +1,6 @@
 # Missing features: Ticket Scheduler and Resource Manager
 
-Estimated reading time: 5 minutes (150 WPM)
+Estimated reading time: 6 minutes (150 WPM)
 
 This is a checklist of work needed for the two apps to work together, not authorization to implement it or run live agents. See [discussion](open-discussion.md), the [Resource Manager data design](../../agent-resource-manager/docs/data.md), and the [sequence diagram](../../agent-resource-manager/docs/sequence-diagram.md) for decisions and remaining details.
 
@@ -12,17 +12,18 @@ This is a checklist of work needed for the two apps to work together, not author
 
 ## Shared data and coordination
 
-- [ ] Add and migrate the agent's OpenCode URL while preserving numeric `agents.id` and existing data. Decide provisioning and handling of older rows without a URL.
-- [ ] Add the agreed execution fields and statuses from the data design, linked to assignments. Store session IDs, outcomes, and `work_requested_at`; count only records with a recorded work request. An unrecorded request after a crash does not count, even if work was sent.
-- [ ] Add the agreed lock fields and shared lock protocol: atomic acquisition by unique name and owner token, owner-checked release, and retry on a later tick if held. Do not automatically remove potentially stale locks. The warning threshold and human recovery steps are deferred.
-- [ ] Make both apps use the same SQLite database and coordination protocol. SQLite WAL is a same-host proof-of-concept choice; a future database migration is separate work. Coordinate schema migrations and preserve existing reservations.
+- [ ] Make the planned agent URL available in the shared agents data while preserving numeric `agents.id` and existing data. Provisioning and handling of older rows remain to be worked out.
+- [ ] Use the agreed execution fields and statuses from the [shared data reference](shared-data.md), linked to assignments. Store session IDs, outcomes, and `work_requested_at`; count only records with a recorded work request. An unrecorded request after a crash does not count, even if work was sent.
+- [ ] Implement the shared lock protocol against the existing lock table: atomic acquisition by unique name and owner token, owner-checked release, and retry on a later tick if held. Do not automatically remove potentially stale locks. The warning threshold and human recovery steps are deferred.
+- [ ] Make both apps use the same SQLite database and coordination protocol. The scheduler assumes the database and all tables are already set up; it does not create or migrate them. SQLite WAL is a same-host proof-of-concept choice; a future database migration is separate work. Preserve existing reservations.
 
 ## Ticket Scheduler
 
 - [ ] Hold the shared lock across board fetch, ticket sync, and assignment selection/creation. Preserve the existing rules: only present `Ready` or `Retry` tickets, no incomplete assignment, and an `idle` agent without an incomplete assignment.
-- [ ] Before assigning an eligible `Retry` ticket, count its recorded attempts through executions and assignments. The initial attempt counts as 1. The limit and its configuration are not yet decided.
-- [ ] At the limit, move the card to `Flagged tickets` rather than creating an assignment. Add the required Vikunja move operation and handle unavailable counts, missing or ambiguous columns, and failed or uncertain moves without creating an extra attempt.
-- [ ] Continue to exclude unavailable agents; use another available agent for an eligible retry. The exact human-review status and recovery procedure remain to be worked out.
+- [ ] Before assigning an eligible `Retry` ticket, count its recorded attempts through executions and assignments. The initial attempt counts as 1. `SCHEDULER_MAX_ATTEMPTS` defaults to 3, but is not enforced yet.
+- [ ] If reading a `Retry` ticket's attempt count fails, log the error, stop the pass without assigning work, and retry next pass.
+- [ ] At the limit, move the card to `Flagged tickets` rather than creating an assignment. Add the required Vikunja move operation and handle missing or ambiguous columns. If a move fails or is uncertain, log it, stop the pass without assigning work, and fetch the board again next pass before retrying.
+- [ ] Continue to select only `idle` agents without an incomplete assignment for eligible retries. The scheduler relies on the agents table; maintaining its correspondence with real resources belongs to the Resource Manager.
 
 ## Resource Manager
 

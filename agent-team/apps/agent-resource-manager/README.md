@@ -13,6 +13,8 @@ npm run dev
 
 The loop logs that it is idle every 30 seconds. Stop it with Ctrl+C. To run the compiled app, use `npm run build` followed by `npm start`.
 
+For the shared database prerequisite, see [setup](docs/setup.md).
+
 **Start here:** read the [scheduler handoff](../scheduler/docs/agent-resource-manager.md) for the agreed responsibilities, current database behavior, example lifecycle, and decisions still open. Then check the linked scheduler source before designing an integration.
 
 The handoff is context for future work, not authorization to start agents, modify infrastructure, or implement the app without a request.

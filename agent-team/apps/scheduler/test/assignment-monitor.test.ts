@@ -4,11 +4,11 @@ import { test } from "node:test"
 import { AssignmentMonitor } from "../src/components/assignment-monitor.js"
 import { AgentStore } from "../src/db/agent-store.js"
 import { AssignmentStore } from "../src/db/assignment-store.js"
-import { openDatabase } from "../src/db/database.js"
+import { createTestDatabase } from "./fixtures/database.js"
 import { TicketStore } from "../src/db/ticket-store.js"
 
 function setup() {
-  const database = openDatabase(":memory:")
+  const database = createTestDatabase()
   const ticket = new TicketStore(database).create({
     vikunjaTaskId: 42, title: "Test", status: "Ready", priority: 0, presentOnBoard: true,
   })

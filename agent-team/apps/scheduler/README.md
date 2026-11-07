@@ -1,6 +1,6 @@
 # Scheduler v2 scaffold
 
-Estimated reading time: 10 minutes (150 WPM)
+Estimated reading time: 11 minutes (150 WPM)
 
 Standalone TypeScript Express app with SQLite persistence, local agent assignment, and Vikunja Kanban fetching. `index.ts` runs `Scheduler.runOnce()` continuously. Assignment reserves a local agent; it does not start an OpenCode session or move a card. The future resource manager will handle agent execution and card movement; it is not implemented. The existing `frontend-ctr` stays separate.
 
@@ -24,6 +24,7 @@ Defaults to `http://127.0.0.1:3300`. No authentication: keep it local.
 - `SCHEDULER_DB_PATH`: default `data/scheduler.sqlite`, relative to the working directory.
 - `SCHEDULER_POLL_MS`: wait after each completed pass, default `30000` (30 seconds). Must be an integer from 1 through 2147483647.
 - `SCHEDULER_ASSIGNMENT_WARNING_MS`: age at which to warn about an incomplete `assigned` record, and minimum time between repeated warnings. Default `600000` (10 minutes); must be a positive safe integer.
+- `SCHEDULER_MAX_ATTEMPTS`: total attempts allowed, including the first; defaults to `3` and must be a positive safe integer. This setting is not enforced yet: execution counting and retry-limit checks remain unimplemented.
 - `VIKUNJA_URL`: required server URL, without `/api/v1`.
 - `VIKUNJA_API_TOKEN`: required API token.
 - `VIKUNJA_PROJECT_ID`: required positive project ID.
@@ -31,7 +32,7 @@ Defaults to `http://127.0.0.1:3300`. No authentication: keep it local.
 
 Export these Vikunja settings before `npm run dev` or `npm start`; this app does not automatically load `.env.local`. IDs and credentials have no working defaults.
 
-The database directory and domain tables are created automatically. Database files are git-ignored. Keep the same database path to retain state across restarts.
+The database and tables must already exist; the scheduler does not create or migrate them. See [database setup](docs/setup.md). Database files are git-ignored. Keep the same database path to retain state across restarts.
 
 ## Endpoints
 
@@ -57,7 +58,7 @@ SIGINT or SIGTERM stops the loop and cancels its polling wait. An active pass fi
 
 `SchedulerDatabase.syncTickets()` atomically reconciles a complete successful fetch: it creates or updates tickets by Vikunja task ID, preserving local IDs and copying title, status, and priority exactly. Fetched tickets have `present_on_board = 1`; missing tickets have `present_on_board = 0` and remain in the database along with their assignments. Missing tickets are not eligible for new assignments, and become eligible again when they reappear in `Ready` or `Retry`. A failed fetch leaves presence unchanged and the pass does not assign work. A database error rolls back the entire sync.
 
-Existing databases are migrated on startup. Previously stored tickets start with `present_on_board = 0` until the next successful fetch establishes presence. SQLite stores the flag as `0` or `1`; `TicketStore` exposes it as the boolean `presentOnBoard`.
+Existing databases must already have `tickets.present_on_board`; the scheduler does not migrate them. SQLite stores the flag as `0` or `1`; `TicketStore` exposes it as the boolean `presentOnBoard`.
 
 `AgentManager.assignTicket()` chooses the first idle agent in local ID order with no incomplete assignment. `SchedulerDatabase.createAssignment()` records ownership in a SQLite transaction, without changing the ticket or agent status. No agent available means no assignment. Missing or invalid connection settings prevent startup.
 

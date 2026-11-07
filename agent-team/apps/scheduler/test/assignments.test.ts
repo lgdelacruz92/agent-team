@@ -4,11 +4,11 @@ import { test } from "node:test"
 import { SchedulerDatabase } from "../src/components/scheduler-database.js"
 import { AgentStore } from "../src/db/agent-store.js"
 import { AssignmentStore } from "../src/db/assignment-store.js"
-import { openDatabase } from "../src/db/database.js"
+import { createTestDatabase } from "./fixtures/database.js"
 import { TicketStore } from "../src/db/ticket-store.js"
 
 function setup() {
-  const database = openDatabase(":memory:")
+  const database = createTestDatabase()
   const tickets = new TicketStore(database)
   const agents = new AgentStore(database)
   const assignments = new AssignmentStore(database)

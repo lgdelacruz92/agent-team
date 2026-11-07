@@ -6,6 +6,7 @@ const _port = Number(process.env.PORT ?? "3300")
 const _databasePath = resolve(process.env.SCHEDULER_DB_PATH ?? "data/scheduler.sqlite")
 const _pollMs = Number(process.env.SCHEDULER_POLL_MS ?? "30000")
 const _assignmentWarningMs = Number(process.env.SCHEDULER_ASSIGNMENT_WARNING_MS ?? "600000")
+const _maxAttempts = Number(process.env.SCHEDULER_MAX_ATTEMPTS ?? "3")
 
 if (!Number.isInteger(_port) || _port < 1 || _port > 65535) {
   throw new Error("PORT must be an integer between 1 and 65535")
@@ -20,12 +21,17 @@ if (!Number.isSafeInteger(_assignmentWarningMs) || _assignmentWarningMs < 1) {
   throw new Error("SCHEDULER_ASSIGNMENT_WARNING_MS must be a positive safe integer")
 }
 
+if (!Number.isSafeInteger(_maxAttempts) || _maxAttempts < 1) {
+  throw new Error("SCHEDULER_MAX_ATTEMPTS must be a positive safe integer")
+}
+
 export const config = {
   host: _host,
   port: _port,
   databasePath: _databasePath,
   pollMs: _pollMs,
   assignmentWarningMs: _assignmentWarningMs,
+  maxAttempts: _maxAttempts,
 
   // Required when index.ts constructs the client for continuous scheduling.
   vikunja: {

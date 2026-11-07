@@ -6,14 +6,14 @@ import { Scheduler } from "../src/components/scheduler.js"
 import { SchedulerDatabase } from "../src/components/scheduler-database.js"
 import { AgentStore } from "../src/db/agent-store.js"
 import { AssignmentStore } from "../src/db/assignment-store.js"
-import { openDatabase } from "../src/db/database.js"
+import { createTestDatabase } from "./fixtures/database.js"
 import { TicketStore } from "../src/db/ticket-store.js"
 
 const first = { vikunjaTaskId: 42, title: "Build a form", status: "Ready", priority: 3 }
 const second = { vikunjaTaskId: 43, title: "Other", status: "Retry", priority: 1 }
 
 test("syncTickets updates presence atomically, preserves IDs, and restores returning tickets", async () => {
-  const database = openDatabase(":memory:")
+  const database = createTestDatabase()
   try {
     const tickets = new TicketStore(database)
     const scheduler = new SchedulerDatabase(database)
@@ -37,7 +37,7 @@ test("syncTickets updates presence atomically, preserves IDs, and restores retur
 })
 
 test("an empty successful board marks all tickets absent without deleting assignments", async () => {
-  const database = openDatabase(":memory:")
+  const database = createTestDatabase()
   try {
     const scheduler = new SchedulerDatabase(database)
     const tickets = new TicketStore(database)
@@ -61,7 +61,7 @@ test("an empty successful board marks all tickets absent without deleting assign
 })
 
 test("a failed sync rolls back presence and ticket changes", async () => {
-  const database = openDatabase(":memory:")
+  const database = createTestDatabase()
   try {
     const scheduler = new SchedulerDatabase(database)
     const tickets = new TicketStore(database)
@@ -83,7 +83,7 @@ test("a failed sync rolls back presence and ticket changes", async () => {
 })
 
 test("a failed board fetch leaves presence unchanged and skips assignment", async () => {
-  const database = openDatabase(":memory:")
+  const database = createTestDatabase()
   try {
     const schedulerDatabase = new SchedulerDatabase(database)
     const tickets = new TicketStore(database)
@@ -105,7 +105,7 @@ test("a failed board fetch leaves presence unchanged and skips assignment", asyn
 })
 
 test("a successful fetch missing a previously ready ticket cannot assign it", async () => {
-  const database = openDatabase(":memory:")
+  const database = createTestDatabase()
   try {
     const schedulerDatabase = new SchedulerDatabase(database)
     const tickets = new TicketStore(database)
@@ -125,7 +125,7 @@ test("a successful fetch missing a previously ready ticket cannot assign it", as
 })
 
 test("getReadyTickets selects only present Ready and Retry tickets in local ID order", async () => {
-  const database = openDatabase(":memory:")
+  const database = createTestDatabase()
   try {
     const scheduler = new SchedulerDatabase(database)
     await scheduler.syncTickets([
@@ -143,7 +143,7 @@ test("getReadyTickets selects only present Ready and Retry tickets in local ID o
 })
 
 test("getReadyTickets skips incomplete assignments and allows completed history", async () => {
-  const database = openDatabase(":memory:")
+  const database = createTestDatabase()
   try {
     const scheduler = new SchedulerDatabase(database)
     const tickets = new TicketStore(database)

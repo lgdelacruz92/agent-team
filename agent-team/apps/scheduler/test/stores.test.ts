@@ -1,21 +1,21 @@
 // Exercises each table store, database constraints, and persistence across restarts.
 import assert from "node:assert/strict"
-import { mkdtempSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test } from "node:test"
 import { DatabaseSync } from "node:sqlite"
-import { SchedulerDatabase } from "../src/components/scheduler-database.js"
 import { AgentStore } from "../src/db/agent-store.js"
 import { AssignmentStore } from "../src/db/assignment-store.js"
 import { openDatabase } from "../src/db/database.js"
 import { TicketStore } from "../src/db/ticket-store.js"
+import { createTestDatabase } from "./fixtures/database.js"
 
 const ticketInput = { vikunjaTaskId: 42, title: "Build a form", status: "Ready", priority: 2, presentOnBoard: true }
 const agentInput = { name: "frontend-1", status: "idle" }
 
 test("TicketStore creates, looks up, lists, updates and deletes tickets", () => {
-  const database = openDatabase(":memory:")
+  const database = createTestDatabase()
 
   try {
     const store = new TicketStore(database)
@@ -41,7 +41,7 @@ test("TicketStore creates, looks up, lists, updates and deletes tickets", () => 
 })
 
 test("AgentStore creates, looks up, lists, updates and deletes agents", () => {
-  const database = openDatabase(":memory:")
+  const database = createTestDatabase()
 
   try {
     const store = new AgentStore(database)
@@ -63,7 +63,7 @@ test("AgentStore creates, looks up, lists, updates and deletes agents", () => {
 })
 
 test("AssignmentStore supports history, filtering, completion and deletion", () => {
-  const database = openDatabase(":memory:")
+  const database = createTestDatabase()
 
   try {
     const tickets = new TicketStore(database)
@@ -103,7 +103,7 @@ test("AssignmentStore supports history, filtering, completion and deletion", () 
 })
 
 test("assignments enforce both foreign keys and protect referenced records", () => {
-  const database = openDatabase(":memory:")
+  const database = createTestDatabase()
 
   try {
     const tickets = new TicketStore(database)
@@ -131,7 +131,7 @@ test("all three tables retain data after closing and reopening SQLite", () => {
   const path = join(directory, "nested", "scheduler.sqlite")
 
   try {
-    const first = openDatabase(path)
+    const first = createTestDatabase(path)
     let ticketId: number
     let agentId: number
     let assignmentId: number
@@ -158,7 +158,35 @@ test("all three tables retain data after closing and reopening SQLite", () => {
   }
 })
 
-test("opening a legacy database preserves records and requires a board sync to establish presence", async () => {
+test("opening a missing database fails without creating a file or directory", () => {
+  const directory = mkdtempSync(join(tmpdir(), "scheduler-missing-test-"))
+  const path = join(directory, "nested", "scheduler.sqlite")
+  try {
+    assert.throws(() => openDatabase(path), /database does not exist/)
+    assert.equal(existsSync(join(directory, "nested")), false)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test("opening an empty database fails without creating tables", () => {
+  const directory = mkdtempSync(join(tmpdir(), "scheduler-empty-test-"))
+  const path = join(directory, "scheduler.sqlite")
+  try {
+    new DatabaseSync(path).close()
+    assert.throws(() => openDatabase(path), /schema is missing or incompatible/)
+    const database = new DatabaseSync(path)
+    try {
+      assert.deepEqual(database.prepare("SELECT name FROM sqlite_schema WHERE type = 'table'").all(), [])
+    } finally {
+      database.close()
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test("opening a legacy database fails without migrating or changing its records", () => {
   const directory = mkdtempSync(join(tmpdir(), "scheduler-migration-test-"))
   const path = join(directory, "scheduler.sqlite")
   try {
@@ -176,24 +204,15 @@ test("opening a legacy database preserves records and requires a board sync to e
     `)
     legacy.close()
 
-    const database = openDatabase(path)
+    assert.throws(() => openDatabase(path), /schema is missing or incompatible/)
+    const database = new DatabaseSync(path)
     try {
-      const scheduler = new SchedulerDatabase(database)
-      const tickets = new TicketStore(database)
-      assert.deepEqual(tickets.get(1), { ...ticketInput, id: 1, presentOnBoard: false })
-      assert.equal(new AssignmentStore(database).get(1)?.ticketId, 1)
-      assert.deepEqual(await scheduler.getReadyTickets(), [])
-      await scheduler.syncTickets([{ vikunjaTaskId: 42, title: "Build a form", status: "Ready", priority: 2 }])
-      assert.equal(tickets.get(1)?.presentOnBoard, true)
-      assert.equal(new AssignmentStore(database).get(1)?.agentId, 1)
+      const columns = database.prepare("PRAGMA table_info(tickets)").all()
+      assert.equal(columns.some((column) => column.name === "present_on_board"), false)
+      assert.equal(database.prepare("SELECT title FROM tickets WHERE id = 1").get()?.title, "Build a form")
+      assert.equal(database.prepare("SELECT agent_id FROM assignments WHERE id = 1").get()?.agent_id, 1)
     } finally {
       database.close()
-    }
-    const reopened = openDatabase(path)
-    try {
-      assert.equal(new TicketStore(reopened).get(1)?.presentOnBoard, true)
-    } finally {
-      reopened.close()
     }
   } finally {
     rmSync(directory, { recursive: true, force: true })
