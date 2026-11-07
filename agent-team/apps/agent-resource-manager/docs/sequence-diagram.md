@@ -9,12 +9,16 @@ Estimated reading time: 3 minutes (150 WPM)
 ```mermaid
 sequenceDiagram
     autonumber
-    participant V as Vikunja
-    participant S as Ticket Scheduler
-    participant DB as Shared SQLite
+    box rgb(30,58,138)
+        participant V as Vikunja
+        participant S as Ticket Scheduler
+        participant DB as Shared SQLite
+    end
     participant RM as Resource manager
-    participant A as OpenCode agent
-    participant H as Human monitor
+    box rgb(30,58,138)
+        participant A as OpenCode agent
+        participant H as Human monitor
+    end
 
     loop Every Resource Manager tick for each agent
         RM->>A: Check agent status
@@ -99,7 +103,7 @@ sequenceDiagram
     end
 ```
 
-The diagram shows logical interactions, not a promise that every action occurs in one pass. Retries, restarts, and failures may span multiple passes.
+Dark blue groups are outside the Resource Manager app. The diagram shows logical interactions, not a promise that every action occurs in one pass. Retries, restarts, and failures may span multiple passes.
 
 ## Discussed: directions to implement
 

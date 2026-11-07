@@ -15,7 +15,11 @@ flowchart LR
     A -->|"observed state"| RM
     RM -->|"report agent + assignment state"| DB
     RM -->|"move and check cards"| V
+    classDef external fill:#dbeafe,stroke:#1d4ed8,color:#111827
+    class V,S,DB,A external
 ```
+
+Blue boxes are outside the Resource Manager app.
 
 SQLite is the shared job board. An assignment reserves work; it does not prove that the agent started.
 

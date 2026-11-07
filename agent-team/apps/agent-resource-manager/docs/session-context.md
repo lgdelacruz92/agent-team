@@ -1,6 +1,6 @@
 # Agent resource manager session context
 
-Estimated reading time: 24 minutes (150 WPM)
+Estimated reading time: 26 minutes (150 WPM)
 
 ## Working agreement
 
@@ -90,3 +90,12 @@ Estimated reading time: 24 minutes (150 WPM)
 - User defined **open** to mean a topic not yet discussed. Decisions, including decisions to defer, and implementation details with an agreed direction must not be called open. Updated the sequence diagram to separate agreed directions, details to work out, and the undiscussed manual-card-move topic.
 - User decided to assume humans do not manually move Vikunja cards and not add Resource Manager handling for that case. User expects the Ticket Scheduler to flag data inconsistencies appropriately. Existing code logs invalid Vikunja responses and warnings for long-waiting or invalid-timestamp assignments, but general inconsistency detection was not established; do not claim broader coverage without verification. Removed the manual-move question from the sequence diagram's undiscussed topics.
 - User requested a commit of the updated terminology, sequence diagram, and manual-board-move assumption.
+- User resumed work on the Resource Manager and asked to read the folder, its project documents, and the pause-and-resume note-taking agreement. Reviewed the manager docs, Ticket Scheduler handoffs and relevant implementation, and the existing OpenCode client. No implementation was requested or started. Remind the user to begin by modelling the app's entity interfaces.
+- User requested a reusable `project-resume` skill, triggered by saying "project resume", based on the project-reading and note-taking workflow just performed. The Resource Manager's per-prompt note-taking agreement remains in effect.
+- User asked where the project was left off. The next step is to model entity interfaces; the app remains unimplemented and real automatic dispatch and release require the previously discussed coordination work.
+- User asked whether the Scheduler in the Resource Manager flowchart is outside this app. It represents the separate Ticket Scheduler in `apps/scheduler`, not an internal Resource Manager component.
+- User asked whether the Ticket Scheduler is the only external part of the big-picture flowchart. Vikunja, shared SQLite, and the real OpenCode agents are also outside the Resource Manager app; the Resource Manager interacts with them.
+- User requested visual distinction for external components in the big-picture flowchart. Colored Vikunja, Ticket Scheduler, shared SQLite, and the real agent blue and added a legend; the Resource Manager retains the default style.
+- User clarified that the coloring request was for the sequence diagram, but asked to keep the flowchart coloring too. Grouped external sequence participants in blue, including the human monitor, while leaving the Resource Manager outside the groups.
+- User found the sequence diagram's light blue hard to read and requested dark blue. Changed the external groups to dark blue and moved their label to the legend to avoid low-contrast text on the dark background.
+- User requested a commit of the session's Resource Manager documentation changes.
