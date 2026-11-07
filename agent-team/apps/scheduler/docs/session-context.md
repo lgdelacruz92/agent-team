@@ -1,6 +1,6 @@
 # Scheduler session context
 
-Estimated reading time: 9 minutes (150 WPM)
+Estimated reading time: 11 minutes (150 WPM)
 
 ## Purpose
 
@@ -12,8 +12,8 @@ The user also hopes the scheduling system can serve as a blueprint for many appl
 
 - `scheduler/` is a standalone TypeScript and Express scaffold with SQLite persistence.
 - It has generic state endpoints, domain stores for tickets, agents and assignments, and interfaces for future components.
-- `Scheduler.runOnce()` orchestration and Vikunja Kanban fetching are implemented as standalone components, not wired into the app. Worker dispatch is not implemented. `frontend-ctr` remains separate.
-- The SQLite stores and HTTP scaffold are implemented. `saveTicket`, `createAssignment`, Agent Manager, and `markInProgress` implementations remain unfinished; `runOnce` trusts their interfaces.
+- `Scheduler.runOnce()` orchestration and Vikunja Kanban fetching are implemented. `index.ts` constructs the components and calls `runOnce` once after the HTTP server starts. No polling or worker dispatch is implemented. `frontend-ctr` remains separate.
+- The SQLite stores and HTTP scaffold are implemented. `saveTicket`, `createAssignment`, `AgentManager.assignTicket`, and `markInProgress` are explicit throwing placeholders; real behavior remains unfinished.
 - The user prefers to start with the scheduler database, thinking about the data before the scheduling workflow.
 - The first implemented method is `SchedulerDatabaseInterface.getReadyTickets`. The user initially deferred `VikunjaInterface`, then asked to implement Vikunja tickets next.
 - The ready-ticket lookup selects local tickets whose status is exactly `Ready` or `Retry`, in local ID order, without changing their stored statuses. Both statuses are conceptually ready to schedule. Dependency and priority rules are not implemented.
@@ -76,4 +76,15 @@ The user then added the project goal and requested another commit.
 - Agent Manager owns assignment persistence and the local ticket update. After it returns an assignment, the scheduler awaits `markInProgress` using the Vikunja task ID, not the local ticket ID.
 - Errors propagate and stop the pass. No rollback, recovery policy, additional dependency implementation, or application wiring was added.
 - Added `test/scheduler.test.ts` with interface doubles, covering call order, one-ticket selection, Retry eligibility, empty cases, and failures at each dependency step. All 32 tests and application/new-test-file typechecks passed.
-- The user requested committing the runOnce implementation, its tests, and these session notes.
+- The user requested committing the runOnce implementation, its tests, and these session notes. Committed as `647fb26`.
+- The user asked whether `index.ts` would call `runOnce`. At that point nothing called it in the running app. Recommended `index.ts` for constructing dependencies and a non-overlapping caller-controlled loop. No wiring was added during that discussion.
+
+## Startup runOnce wiring
+
+- The user requested calling `runOnce`, permitting an Agent Manager class and constructor only. Explained that incomplete dependency classes cannot satisfy the interfaces; the user explicitly selected “Allow throwing placeholders” rather than implementing real behavior.
+- Added `src/components/agent-manager.ts` with a constructor receiving the scheduler database and a throwing `assignTicket` placeholder. Added throwing `saveTicket`, `createAssignment`, and `markInProgress` methods to complete the dependency interfaces. These placeholders do not return fake success or report unavailability.
+- Updated `index.ts` to construct Vikunja, a shared domain database connection, TicketStore, SchedulerDatabase, AgentManager, and Scheduler. It calls `runOnce` once after the HTTP server starts listening, catches and logs errors, and leaves the HTTP scaffold available. No repeated loop or real assignment/movement logic was added.
+- Configuration requires exported `VIKUNJA_URL`, `VIKUNJA_API_TOKEN`, `VIKUNJA_PROJECT_ID`, and `VIKUNJA_VIEW_ID`. No real IDs or credentials were supplied or guessed. Missing/invalid settings prevent startup; `.env.local` is not loaded automatically.
+- Shutdown waits for the startup pass before closing both state and domain SQLite connections. With fetched cards, the current pass fails explicitly at the unfinished `saveTicket` method.
+- Added placeholder tests and a subprocess startup test against a local fake board. Verified one board request, explicit placeholder failure, continued HTTP health access, and clean SIGTERM shutdown. No request was made to the user's board. All 36 tests, application and new-test-file typechecks, and build passed.
+- The user requested committing the startup wiring, Agent Manager shell, approved placeholders, configuration, tests, and documentation.

@@ -1,8 +1,8 @@
 # Scheduler v2 scaffold
 
-Estimated reading time: 3 minutes (150 WPM)
+Estimated reading time: 4 minutes (150 WPM)
 
-Standalone TypeScript Express app with SQLite persistence and a Kanban ticket-fetching component. No scheduling or worker dispatch yet. The existing `frontend-ctr` stays separate.
+Standalone TypeScript Express app with SQLite persistence and Kanban ticket fetching. `index.ts` calls `Scheduler.runOnce()` once at startup; unfinished dependency methods throw explicit errors. No working assignment or worker dispatch yet. The existing `frontend-ctr` stays separate.
 
 ## Run
 
@@ -22,6 +22,12 @@ Defaults to `http://127.0.0.1:3300`. No authentication: keep it local.
 - `HOST`: default `127.0.0.1`.
 - `PORT`: default `3300`.
 - `SCHEDULER_DB_PATH`: default `data/scheduler.sqlite`, relative to the working directory.
+- `VIKUNJA_URL`: required server URL, without `/api/v1`.
+- `VIKUNJA_API_TOKEN`: required API token.
+- `VIKUNJA_PROJECT_ID`: required positive project ID.
+- `VIKUNJA_VIEW_ID`: required positive Kanban view ID.
+
+Export these Vikunja settings before `npm run dev` or `npm start`; this app does not automatically load `.env.local`. IDs and credentials have no working defaults.
 
 The database directory and table are created automatically. Database files are git-ignored. Keep the same database path to retain state across restarts.
 
@@ -49,7 +55,11 @@ npm start
 
 ## Kanban ticket fetching
 
-`src/components/vikunja.ts` reads one existing Kanban board. Supply connection settings explicitly; the HTTP scaffold does not call this component yet.
+`src/components/vikunja.ts` reads one existing Kanban board. `index.ts` constructs the components from environment settings and starts one pass after the HTTP server begins listening. A failed pass is logged; HTTP endpoints remain available. There is no polling loop. Shutdown waits for the pass before closing SQLite.
+
+`saveTicket`, `createAssignment`, `assignTicket`, and `markInProgress` are throwing placeholders, not real implementations. With any fetched cards, the pass currently fails at `saveTicket`; it does not persist or assign them. Missing or invalid connection settings prevent startup.
+
+For direct use, supply connection settings explicitly:
 
 ```ts
 import { Vikunja } from "./src/components/vikunja.js"
@@ -101,4 +111,4 @@ SQLite generates local IDs. IDs use JavaScript numbers within the safe integer r
 
 Foreign keys prevent orphan assignments and deletion of referenced tickets or agents. Delete assignments explicitly first. The stores do not impose scheduling rules.
 
-The existing HTTP endpoints still use `StateStore` for generic JSON state. Table stores have no HTTP routes or scheduling integration yet.
+The existing HTTP endpoints still use `StateStore` for generic JSON state. The startup pass uses a separate shared connection for domain stores; those stores still have no HTTP routes.

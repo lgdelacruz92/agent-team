@@ -57,8 +57,8 @@ function readBuckets(value: unknown): KanbanBucket[] {
   })
 }
 
-// Only ticket fetching is implemented; moving a card will follow separately.
-export class Vikunja implements Pick<VikunjaInterface, "getTickets"> {
+// Ticket fetching is implemented; moving a card remains a throwing placeholder.
+export class Vikunja implements VikunjaInterface {
   private readonly baseUrl: string
   private readonly perPage: number
   private readonly timeoutMs: number
@@ -134,6 +134,10 @@ export class Vikunja implements Pick<VikunjaInterface, "getTickets"> {
 
       page += 1
     }
+  }
+
+  async markInProgress(_vikunjaTaskId: number): Promise<void> {
+    throw new Error("Vikunja.markInProgress is not implemented")
   }
 
   private async getPage(page: number): Promise<KanbanBucket[]> {

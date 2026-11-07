@@ -13,4 +13,12 @@ export const config = {
   host: _host,
   port: _port,
   databasePath: _databasePath,
+
+  // Required when index.ts constructs the client for the startup scheduling pass.
+  vikunja: {
+    baseUrl: process.env.VIKUNJA_URL ?? "",
+    token: process.env.VIKUNJA_API_TOKEN ?? "",
+    projectId: Number(process.env.VIKUNJA_PROJECT_ID ?? "0"),
+    viewId: Number(process.env.VIKUNJA_VIEW_ID ?? "0"),
+  },
 }
