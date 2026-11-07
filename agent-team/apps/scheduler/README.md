@@ -51,7 +51,9 @@ npm start
 
 SIGINT or SIGTERM stops the loop and cancels its polling wait. An active pass finishes before the SQLite connection closes. `Scheduler.runOnce()` remains one pass; repetition lives in `src/scheduler-loop.ts`.
 
-`SchedulerDatabase.saveTicket()` creates or updates each fetched ticket by its Vikunja task ID, preserving its local ID and copying title, status, and priority exactly. Repeated saves do not create duplicates. Tickets absent from a fetch are not deleted.
+`SchedulerDatabase.syncTickets()` atomically reconciles a complete successful fetch: it creates or updates tickets by Vikunja task ID, preserving local IDs and copying title, status, and priority exactly. Fetched tickets have `present_on_board = 1`; missing tickets have `present_on_board = 0` and remain in the database along with their assignments. Missing tickets are not eligible for new assignments, and become eligible again when they reappear in `Ready` or `Retry`. A failed fetch leaves presence unchanged and the pass does not assign work. A database error rolls back the entire sync.
+
+Existing databases are migrated on startup. Previously stored tickets start with `present_on_board = 0` until the next successful fetch establishes presence. SQLite stores the flag as `0` or `1`; `TicketStore` exposes it as the boolean `presentOnBoard`.
 
 `AgentManager.assignTicket()` chooses the first idle agent in local ID order with no incomplete assignment. `SchedulerDatabase.createAssignment()` records ownership and updates the local ticket in one SQLite transaction, without changing the agent's status. The scheduler then calls `Vikunja.markInProgress()`. No agent available means no assignment and no card movement. Missing or invalid connection settings prevent startup.
 
@@ -72,7 +74,7 @@ const vikunja = new Vikunja({
 const tickets = await vikunja.getTickets()
 ```
 
-Each result contains `vikunjaTaskId`, `title`, `status`, and `priority`. Column titles become statuses exactly as written: `Ready`, `In progress`, `Retry`, and `Done`. All columns are fetched; `SchedulerDatabase.getReadyTickets()` separately selects `Ready` and `Retry`.
+Each result contains `vikunjaTaskId`, `title`, `status`, and `priority`. Column titles become statuses exactly as written: `Ready`, `In progress`, `Retry`, and `Done`. All columns are fetched; `SchedulerDatabase.getReadyTickets()` separately selects present tickets in `Ready` or `Retry`.
 
 Pagination uses each column's `count`, not the outer pagination header. Empty columns may contain `tasks: null`. Duplicate task IDs are returned once. Failed requests, invalid data, and stalled pagination throw rather than returning partial results. Multiple requests are not an atomic board snapshot; cards can move while pages are fetched.
 

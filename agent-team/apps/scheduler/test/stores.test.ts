@@ -4,12 +4,14 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test } from "node:test"
+import { DatabaseSync } from "node:sqlite"
+import { SchedulerDatabase } from "../src/components/scheduler-database.js"
 import { AgentStore } from "../src/db/agent-store.js"
 import { AssignmentStore } from "../src/db/assignment-store.js"
 import { openDatabase } from "../src/db/database.js"
 import { TicketStore } from "../src/db/ticket-store.js"
 
-const ticketInput = { vikunjaTaskId: 42, title: "Build a form", status: "Ready", priority: 2 }
+const ticketInput = { vikunjaTaskId: 42, title: "Build a form", status: "Ready", priority: 2, presentOnBoard: true }
 const agentInput = { name: "frontend-1", status: "idle" }
 
 test("TicketStore creates, looks up, lists, updates and deletes tickets", () => {
@@ -148,6 +150,48 @@ test("all three tables retain data after closing and reopening SQLite", () => {
       assert.equal(new AgentStore(reopened).get(agentId)?.name, "frontend-1")
       assert.equal(new AssignmentStore(reopened).get(assignmentId)?.ticketId, ticketId)
       assert.throws(() => new AssignmentStore(reopened).create({ ticketId: 999, agentId, status: "running" }), /FOREIGN KEY constraint failed/)
+    } finally {
+      reopened.close()
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test("opening a legacy database preserves records and requires a board sync to establish presence", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "scheduler-migration-test-"))
+  const path = join(directory, "scheduler.sqlite")
+  try {
+    const legacy = new DatabaseSync(path)
+    legacy.exec(`
+      CREATE TABLE tickets (id INTEGER PRIMARY KEY, vikunja_task_id INTEGER NOT NULL UNIQUE,
+        title TEXT NOT NULL, status TEXT NOT NULL, priority INTEGER NOT NULL) STRICT;
+      CREATE TABLE agents (id INTEGER PRIMARY KEY, name TEXT NOT NULL, status TEXT NOT NULL) STRICT;
+      CREATE TABLE assignments (id INTEGER PRIMARY KEY, ticket_id INTEGER NOT NULL REFERENCES tickets(id),
+        agent_id INTEGER NOT NULL REFERENCES agents(id), status TEXT NOT NULL,
+        assigned_at TEXT NOT NULL, completed_at TEXT) STRICT;
+      INSERT INTO tickets VALUES (1, 42, 'Build a form', 'Ready', 2);
+      INSERT INTO agents VALUES (1, 'agent', 'idle');
+      INSERT INTO assignments VALUES (1, 1, 1, 'assigned', '2026-11-07T12:00:00.000Z', NULL);
+    `)
+    legacy.close()
+
+    const database = openDatabase(path)
+    try {
+      const scheduler = new SchedulerDatabase(database)
+      const tickets = new TicketStore(database)
+      assert.deepEqual(tickets.get(1), { ...ticketInput, id: 1, presentOnBoard: false })
+      assert.equal(new AssignmentStore(database).get(1)?.ticketId, 1)
+      assert.deepEqual(await scheduler.getReadyTickets(), [])
+      await scheduler.syncTickets([{ vikunjaTaskId: 42, title: "Build a form", status: "Ready", priority: 2 }])
+      assert.equal(tickets.get(1)?.presentOnBoard, true)
+      assert.equal(new AssignmentStore(database).get(1)?.agentId, 1)
+    } finally {
+      database.close()
+    }
+    const reopened = openDatabase(path)
+    try {
+      assert.equal(new TicketStore(reopened).get(1)?.presentOnBoard, true)
     } finally {
       reopened.close()
     }

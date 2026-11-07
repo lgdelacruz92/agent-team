@@ -15,7 +15,7 @@ function setup() {
   const assignments = new AssignmentStore(database)
   const schedulerDatabase = new SchedulerDatabase(database)
   const manager = new AgentManager(schedulerDatabase, agents, assignments)
-  const ticket = tickets.create({ vikunjaTaskId: 42, title: "Build a form", status: "Ready", priority: 1 })
+  const ticket = tickets.create({ vikunjaTaskId: 42, title: "Build a form", status: "Ready", priority: 1, presentOnBoard: true })
   return { database, tickets, agents, assignments, schedulerDatabase, manager, ticket }
 }
 
@@ -79,7 +79,8 @@ test("assignTicket reuses active ownership after a board refresh, even with a ne
   try {
     context.agents.create({ name: "frontend", status: "idle" })
     const first = await context.manager.assignTicket(context.ticket)
-    const refreshed = await context.schedulerDatabase.saveTicket(context.ticket)
+    await context.schedulerDatabase.syncTickets([context.ticket])
+    const refreshed = context.tickets.get(context.ticket.id)!
     const restartedManager = new AgentManager(context.schedulerDatabase, context.agents, context.assignments)
     assert.deepEqual(await restartedManager.assignTicket(refreshed), first)
     assert.equal(context.assignments.list().length, 1)
@@ -125,7 +126,7 @@ test("assignTicket rejects non-ready tickets and propagates persistence failures
     context.agents.create({ name: "frontend", status: "idle" })
     const error = new Error("Assignment write failed")
     const manager = new AgentManager({
-      saveTicket: (ticket) => context.schedulerDatabase.saveTicket(ticket),
+      syncTickets: (tickets) => context.schedulerDatabase.syncTickets(tickets),
       getReadyTickets: () => context.schedulerDatabase.getReadyTickets(),
       async createAssignment() { throw error },
     }, context.agents, context.assignments)

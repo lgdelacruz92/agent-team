@@ -1,5 +1,7 @@
 # Database
 
+Estimated reading time: 1 minute (150 WPM)
+
 ```mermaid
 erDiagram
     TICKETS ||--o{ ASSIGNMENTS : has
@@ -11,6 +13,7 @@ erDiagram
         string title
         string status
         int priority
+        boolean present_on_board
     }
 
     AGENTS {

@@ -1,114 +1,144 @@
-// Checks how the scheduler saves tickets and reads ready tickets from its local database.
+// Checks atomic board synchronization and ready-ticket eligibility.
 import assert from "node:assert/strict"
 import { test } from "node:test"
+import { AgentManager } from "../src/components/agent-manager.js"
+import { Scheduler } from "../src/components/scheduler.js"
 import { SchedulerDatabase } from "../src/components/scheduler-database.js"
+import { AgentStore } from "../src/db/agent-store.js"
+import { AssignmentStore } from "../src/db/assignment-store.js"
 import { openDatabase } from "../src/db/database.js"
 import { TicketStore } from "../src/db/ticket-store.js"
 
-test("saveTicket creates a local ticket with every supplied field", async () => {
-  const database = openDatabase(":memory:")
+const first = { vikunjaTaskId: 42, title: "Build a form", status: "Ready", priority: 3 }
+const second = { vikunjaTaskId: 43, title: "Other", status: "Retry", priority: 1 }
 
+test("syncTickets updates presence atomically, preserves IDs, and restores returning tickets", async () => {
+  const database = openDatabase(":memory:")
   try {
     const tickets = new TicketStore(database)
-    const schedulerDatabase = new SchedulerDatabase(database)
-    const input = { vikunjaTaskId: 42, title: "Build a form", status: "Retry", priority: 3 }
+    const scheduler = new SchedulerDatabase(database)
+    await scheduler.syncTickets([first, second])
+    const savedFirst = tickets.getByVikunjaTaskId(first.vikunjaTaskId)!
+    const savedSecond = tickets.getByVikunjaTaskId(second.vikunjaTaskId)!
+    assert.deepEqual(savedFirst, { id: savedFirst.id, ...first, presentOnBoard: true })
+    assert.deepEqual(await scheduler.getReadyTickets(), [savedFirst, savedSecond])
 
-    const saved = await schedulerDatabase.saveTicket(input)
+    await scheduler.syncTickets([{ ...second, title: "Updated" }])
+    assert.deepEqual(tickets.get(savedFirst.id), { ...savedFirst, presentOnBoard: false })
+    assert.deepEqual(await scheduler.getReadyTickets(), [{ ...savedSecond, title: "Updated" }])
 
-    assert.ok(Number.isSafeInteger(saved.id) && saved.id > 0)
-    assert.notEqual(saved.id, input.vikunjaTaskId)
-    assert.deepEqual({ ...saved }, { id: saved.id, ...input })
-    assert.deepEqual(tickets.get(saved.id), saved)
-    assert.deepEqual(await schedulerDatabase.getReadyTickets(), [saved])
+    await scheduler.syncTickets([first, second])
+    assert.deepEqual(tickets.get(savedFirst.id), savedFirst)
+    assert.deepEqual(await scheduler.getReadyTickets(), [savedFirst, savedSecond])
+    assert.equal(tickets.list().length, 2)
   } finally {
     database.close()
   }
 })
 
-test("saveTicket updates by Vikunja ID, preserving the local ID and other tickets", async () => {
+test("an empty successful board marks all tickets absent without deleting assignments", async () => {
   const database = openDatabase(":memory:")
-
   try {
+    const scheduler = new SchedulerDatabase(database)
     const tickets = new TicketStore(database)
-    const schedulerDatabase = new SchedulerDatabase(database)
-    const other = tickets.create({ vikunjaTaskId: 41, title: "Other", status: "Ready", priority: 1 })
-    const existing = tickets.create({ vikunjaTaskId: 42, title: "Old title", status: "Retry", priority: 2 })
-    const input = { vikunjaTaskId: 42, title: "New title", status: "In progress", priority: 5 }
+    const agent = new AgentStore(database).create({ name: "agent", status: "idle" })
+    const assignments = new AssignmentStore(database)
+    await scheduler.syncTickets([first])
+    const ticket = tickets.getByVikunjaTaskId(first.vikunjaTaskId)!
+    const assignment = assignments.create({ ticketId: ticket.id, agentId: agent.id, status: "assigned" })
 
-    const saved = await schedulerDatabase.saveTicket(input)
-
-    assert.deepEqual({ ...saved }, { id: existing.id, ...input })
-    assert.deepEqual(tickets.list(), [other, saved])
-    assert.deepEqual(await schedulerDatabase.getReadyTickets(), [other])
+    await scheduler.syncTickets([])
+    assert.deepEqual(tickets.get(ticket.id), { ...ticket, presentOnBoard: false })
+    assert.deepEqual(assignments.get(assignment.id), assignment)
+    assert.deepEqual(await scheduler.getReadyTickets(), [])
+    await assert.rejects(scheduler.createAssignment({
+      ticketId: ticket.id, agentId: agent.id, assignmentStatus: "assigned",
+      ticketStatus: "In progress", assignedAt: new Date().toISOString(),
+    }), /not ready/)
   } finally {
     database.close()
   }
 })
 
-test("saveTicket repeatedly saves the same task without creating duplicates", async () => {
+test("a failed sync rolls back presence and ticket changes", async () => {
   const database = openDatabase(":memory:")
-
   try {
+    const scheduler = new SchedulerDatabase(database)
     const tickets = new TicketStore(database)
-    const schedulerDatabase = new SchedulerDatabase(database)
-    const input = { vikunjaTaskId: 42, title: "Build a form", status: "Done", priority: 0 }
-
-    const first = await schedulerDatabase.saveTicket(input)
-    const second = await schedulerDatabase.saveTicket(input)
-    const third = await schedulerDatabase.saveTicket(input)
-
-    assert.deepEqual(second, first)
-    assert.deepEqual(third, first)
-    assert.deepEqual(tickets.list(), [first])
+    await scheduler.syncTickets([first, second])
+    const before = tickets.list()
+    database.exec(`
+      CREATE TRIGGER reject_board_insert BEFORE INSERT ON tickets
+      BEGIN SELECT RAISE(ABORT, 'forced sync failure'); END;
+    `)
+    await assert.rejects(scheduler.syncTickets([
+      { ...first, title: "Changed" },
+      { ...second, vikunjaTaskId: 44 },
+    ]), /forced sync failure/)
+    assert.deepEqual(tickets.list(), before)
+    assert.deepEqual(await scheduler.getReadyTickets(), before)
   } finally {
     database.close()
   }
 })
 
-test("saveTicket rejects database failures rather than reporting success", async () => {
+test("a failed board fetch leaves presence unchanged and skips assignment", async () => {
   const database = openDatabase(":memory:")
-  const schedulerDatabase = new SchedulerDatabase(database)
-  database.close()
-
-  await assert.rejects(schedulerDatabase.saveTicket({
-    vikunjaTaskId: 42, title: "Build a form", status: "Ready", priority: 1,
-  }), /database is not open/)
-})
-
-test("getReadyTickets returns an empty list when no tickets are ready", async () => {
-  const database = openDatabase(":memory:")
-
   try {
-    const tickets = new TicketStore(database)
     const schedulerDatabase = new SchedulerDatabase(database)
+    const tickets = new TicketStore(database)
+    const agents = new AgentStore(database)
+    const assignments = new AssignmentStore(database)
+    agents.create({ name: "agent", status: "idle" })
+    await schedulerDatabase.syncTickets([first])
+    const before = tickets.list()
+    const scheduler = new Scheduler({
+      async getTickets() { throw new Error("board unavailable") },
+      async markInProgress() { assert.fail("must not move a card") },
+    }, schedulerDatabase, new AgentManager(schedulerDatabase, agents, assignments))
 
-    assert.deepEqual(await schedulerDatabase.getReadyTickets(), [])
-
-    tickets.create({ vikunjaTaskId: 1, title: "Working", status: "In progress", priority: 1 })
-    assert.deepEqual(await schedulerDatabase.getReadyTickets(), [])
+    await assert.rejects(scheduler.runOnce(), /board unavailable/)
+    assert.deepEqual(tickets.list(), before)
+    assert.deepEqual(assignments.list(), [])
   } finally {
     database.close()
   }
 })
 
-test("getReadyTickets returns Ready and Retry tickets in local ID order without changing their statuses", async () => {
+test("a successful fetch missing a previously ready ticket cannot assign it", async () => {
   const database = openDatabase(":memory:")
-
   try {
-    const tickets = new TicketStore(database)
     const schedulerDatabase = new SchedulerDatabase(database)
+    const tickets = new TicketStore(database)
+    const agents = new AgentStore(database)
+    const assignments = new AssignmentStore(database)
+    agents.create({ name: "agent", status: "idle" })
+    await schedulerDatabase.syncTickets([first])
+    const scheduler = new Scheduler({
+      async getTickets() { return [] },
+      async markInProgress() { assert.fail("must not move a missing card") },
+    }, schedulerDatabase, new AgentManager(schedulerDatabase, agents, assignments))
+    await scheduler.runOnce()
+    assert.equal(tickets.getByVikunjaTaskId(first.vikunjaTaskId)?.presentOnBoard, false)
+    assert.deepEqual(assignments.list(), [])
+  } finally {
+    database.close()
+  }
+})
 
-    const first = tickets.create({ vikunjaTaskId: 10, title: "First", status: "Ready", priority: 1 })
-    tickets.create({ vikunjaTaskId: 11, title: "Under review", status: "Review", priority: 2 })
-    const retry = tickets.create({ vikunjaTaskId: 12, title: "Retry", status: "Retry", priority: 3 })
-    tickets.create({ vikunjaTaskId: 13, title: "Lowercase", status: "ready", priority: 4 })
-    const second = tickets.create({ vikunjaTaskId: 14, title: "Second", status: "Ready", priority: 5 })
-    tickets.create({ vikunjaTaskId: 15, title: "Working", status: "In progress", priority: 1 })
-    tickets.create({ vikunjaTaskId: 16, title: "Finished", status: "Done", priority: 1 })
-    tickets.create({ vikunjaTaskId: 17, title: "Lowercase retry", status: "retry", priority: 1 })
-
-    assert.deepEqual(await schedulerDatabase.getReadyTickets(), [first, retry, second])
-    assert.equal(tickets.get(retry.id)?.status, "Retry")
+test("getReadyTickets selects only present Ready and Retry tickets in local ID order", async () => {
+  const database = openDatabase(":memory:")
+  try {
+    const scheduler = new SchedulerDatabase(database)
+    await scheduler.syncTickets([
+      first,
+      { ...second, status: "Review" },
+      { ...second, vikunjaTaskId: 44 },
+      { ...second, vikunjaTaskId: 45, status: "ready" },
+    ])
+    const ready = await scheduler.getReadyTickets()
+    assert.deepEqual(ready.map((ticket) => ticket.vikunjaTaskId), [42, 44])
+    assert.deepEqual(ready.map((ticket) => ticket.status), ["Ready", "Retry"])
   } finally {
     database.close()
   }

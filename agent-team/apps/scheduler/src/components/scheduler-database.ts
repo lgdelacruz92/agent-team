@@ -18,20 +18,24 @@ export class SchedulerDatabase implements SchedulerDatabaseInterface {
     this.assignments = new AssignmentStore(database)
   }
 
-  async saveTicket(ticket: VikunjaTicket): Promise<SchedulerTicket> {
-    const existingTicket = this.tickets.getByVikunjaTaskId(ticket.vikunjaTaskId)
-
-    if (!existingTicket) {
-      return this.tickets.create(ticket)
+  async syncTickets(tickets: VikunjaTicket[]): Promise<void> {
+    this.database.exec("BEGIN IMMEDIATE")
+    try {
+      this.tickets.markAllAbsent()
+      for (const ticket of tickets) {
+        const existing = this.tickets.getByVikunjaTaskId(ticket.vikunjaTaskId)
+        const input = { ...ticket, presentOnBoard: true }
+        if (!existing) {
+          this.tickets.create(input)
+        } else if (!this.tickets.update(existing.id, input)) {
+          throw new Error(`Ticket ${existing.id} no longer exists`)
+        }
+      }
+      this.database.exec("COMMIT")
+    } catch (error) {
+      this.database.exec("ROLLBACK")
+      throw error
     }
-
-    const savedTicket = this.tickets.update(existingTicket.id, ticket)
-
-    if (!savedTicket) {
-      throw new Error(`Ticket ${existingTicket.id} no longer exists`)
-    }
-
-    return savedTicket
   }
 
   async createAssignment(assignment: NewAssignment): Promise<Assignment> {
@@ -48,7 +52,7 @@ export class SchedulerDatabase implements SchedulerDatabaseInterface {
       if (!agent) {
         throw new Error(`Agent ${assignment.agentId} does not exist`)
       }
-      if (ticket.status !== "Ready" && ticket.status !== "Retry") {
+      if (!ticket.presentOnBoard || (ticket.status !== "Ready" && ticket.status !== "Retry")) {
         throw new Error(`Ticket ${ticket.id} is not ready`)
       }
       if (this.assignments.listByTicketId(ticket.id).some((existing) => existing.completedAt === null)) {
@@ -79,10 +83,10 @@ export class SchedulerDatabase implements SchedulerDatabaseInterface {
     }
   }
 
-  // Ready and Retry tickets are both schedulable; their stored statuses stay unchanged.
+  // Only tickets present on the latest board are schedulable.
   async getReadyTickets(): Promise<SchedulerTicket[]> {
     const tickets = this.tickets.list()
 
-    return tickets.filter((ticket) => ticket.status === "Ready" || ticket.status === "Retry")
+    return tickets.filter((ticket) => ticket.presentOnBoard && (ticket.status === "Ready" || ticket.status === "Retry"))
   }
 }

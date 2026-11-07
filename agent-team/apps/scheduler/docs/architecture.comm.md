@@ -1,5 +1,7 @@
 # Communication
 
+Estimated reading time: 1 minute (150 WPM)
+
 ```mermaid
 sequenceDiagram
     participant S as Scheduler
@@ -10,10 +12,8 @@ sequenceDiagram
     S->>V: Get tickets
     V-->>S: Return tickets
 
-    loop For each ticket
-        S->>DB: Create or update local ticket
-        DB-->>S: Ticket saved
-    end
+    S->>DB: Atomically sync tickets and board presence
+    DB-->>S: Board snapshot saved
 
     S->>DB: Get ready tickets
     DB-->>S: Return ready tickets

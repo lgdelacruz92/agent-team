@@ -12,7 +12,7 @@ function setup() {
   const tickets = new TicketStore(database)
   const agents = new AgentStore(database)
   const assignments = new AssignmentStore(database)
-  const ticket = tickets.create({ vikunjaTaskId: 42, title: "Build a form", status: "Retry", priority: 2 })
+  const ticket = tickets.create({ vikunjaTaskId: 42, title: "Build a form", status: "Retry", priority: 2, presentOnBoard: true })
   const agent = agents.create({ name: "frontend-1", status: "idle" })
   const input = {
     ticketId: ticket.id,
@@ -76,6 +76,19 @@ test("createAssignment rejects a ticket that is not Ready or Retry", async () =>
     assert.deepEqual(context.assignments.list(), [])
     assert.equal(context.tickets.get(context.ticket.id)?.status, "Done")
     assert.equal(context.agents.get(context.agent.id)?.status, "idle")
+  } finally {
+    context.database.close()
+  }
+})
+
+test("createAssignment rejects a ticket absent from the latest board", async () => {
+  const context = setup()
+  try {
+    context.tickets.update(context.ticket.id, { ...context.ticket, presentOnBoard: false })
+    await assert.rejects(context.schedulerDatabase.createAssignment(context.input), /is not ready/)
+    assert.deepEqual(context.assignments.list(), [])
+    assert.equal(context.tickets.get(context.ticket.id)?.status, "Retry")
+    assert.deepEqual(context.agents.get(context.agent.id), context.agent)
   } finally {
     context.database.close()
   }

@@ -1,6 +1,6 @@
 # Scheduler session context
 
-Estimated reading time: 19 minutes (150 WPM)
+Estimated reading time: 20 minutes (150 WPM)
 
 ## Purpose
 
@@ -17,7 +17,7 @@ The user also hopes the scheduling system can serve as a blueprint for many appl
 - Agent selection uses exact status `idle` and no assignment with null `completedAt`, in local agent ID order. Assignment creation updates the ticket and saves ownership atomically, without changing agent status. The future watcher owns reporting real agent status; an incomplete assignment prevents double booking while the agent still reports idle. Agents are prepopulated externally with real IDs; startup does not seed agents or discover OpenCode workers.
 - The user prefers to start with the scheduler database, thinking about the data before the scheduling workflow.
 - The first implemented method is `SchedulerDatabaseInterface.getReadyTickets`. The user initially deferred `VikunjaInterface`, then asked to implement Vikunja tickets next.
-- The ready-ticket lookup selects local tickets whose status is exactly `Ready` or `Retry`, in local ID order, without changing their stored statuses. Both statuses are conceptually ready to schedule. Dependency and priority rules are not implemented.
+- The ready-ticket lookup selects tickets present in the latest successful board fetch whose status is exactly `Ready` or `Retry`, in local ID order, without changing their stored statuses. Both statuses are conceptually ready to schedule. Dependency and priority rules are not implemented.
 - The Vikunja fetch is scoped to the user's existing Kanban board for this session. `frontend-ctr` uses one project and view; that is API reference, not a design to copy automatically.
 
 ## Intended communication
@@ -145,3 +145,10 @@ The user then added the project goal and requested another commit.
 
 - The user wants the future watcher, not the scheduler, to update `agents.status` to reflect real agents. Assignment creation leaves agent status unchanged; an incomplete assignment reserves an idle agent until completion.
 - The user requested new assignments start as `assigned`, not `running`. Existing records are unchanged and may still say `running` without confirming execution. The watcher is not implemented.
+- The user requested a handoff for the future watcher. See `docs/agent-resource-manager.md` for the scheduler contract, Vikunja timing, failure cases, and unresolved integration decisions.
+
+## Scheduler reliability discussion
+
+- The user wants a practical assessment of common operating cases, not exhaustive edge-case hardening; a human can monitor and restart the app.
+- Important gaps identified: Vikunja refreshes overwrite local ticket status; a failed move on the first ready ticket can block later work; health reports process liveness, not successful scheduling. The app does not move completed cards to Done or release assignments automatically.
+- The user accepted adding `present_on_board` so tickets absent from a successful fetch cannot receive new assignments. Board sync updates presence atomically; missing ticket records and existing assignments remain. Failed fetches leave presence unchanged. Existing databases migrate with tickets absent until the next successful sync.

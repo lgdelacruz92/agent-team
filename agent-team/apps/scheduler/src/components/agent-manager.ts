@@ -20,7 +20,7 @@ export class AgentManager implements AgentManagerInterface {
       return existingAssignment
     }
 
-    if (ticket.status !== "Ready" && ticket.status !== "Retry") {
+    if (!ticket.presentOnBoard || (ticket.status !== "Ready" && ticket.status !== "Retry")) {
       throw new Error(`Ticket ${ticket.id} is not ready`)
     }
 

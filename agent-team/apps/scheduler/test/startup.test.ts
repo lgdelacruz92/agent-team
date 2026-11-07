@@ -126,7 +126,7 @@ for (const hasAgent of [false, true]) {
     const database = openDatabase(databasePath)
     try {
       assert.deepEqual(new TicketStore(database).list().map((ticket) => ({ ...ticket })), [
-        { id: 1, vikunjaTaskId: 42, title: "Build a form", status: hasAgent ? "In progress" : "Ready", priority: 1 },
+        { id: 1, vikunjaTaskId: 42, title: "Build a form", status: hasAgent ? "In progress" : "Ready", priority: 1, presentOnBoard: true },
       ])
       const assignments = new AssignmentStore(database).list()
       assert.equal(assignments.length, hasAgent ? 1 : 0)

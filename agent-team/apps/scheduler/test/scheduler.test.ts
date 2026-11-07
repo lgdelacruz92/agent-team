@@ -12,6 +12,7 @@ const readyTicket: SchedulerTicket = {
   title: "Build a form",
   status: "Ready",
   priority: 1,
+  presentOnBoard: true,
 }
 const retryTicket: SchedulerTicket = { ...readyTicket, id: 2, vikunjaTaskId: 43, status: "Retry", priority: 5 }
 const assignment: Assignment = {
@@ -40,10 +41,9 @@ function setup() {
     },
   }
   const database: SchedulerDatabaseInterface = {
-    async saveTicket(ticket) {
-      events.push(`saveTicket:${ticket.vikunjaTaskId}`)
-      savedTickets.push(ticket)
-      return { ...ticket, id: savedTickets.length }
+    async syncTickets(tickets) {
+      events.push("syncTickets")
+      savedTickets.push(...tickets)
     },
     async getReadyTickets() {
       events.push("getReadyTickets")
@@ -70,7 +70,7 @@ test("runOnce saves every fetched ticket before assigning one and marking its Vi
 
   assert.equal(await context.scheduler.runOnce(), undefined)
   assert.deepEqual(context.events, [
-    "getTickets", "saveTicket:42", "saveTicket:43", "getReadyTickets", "assignTicket", "markInProgress",
+    "getTickets", "syncTickets", "getReadyTickets", "assignTicket", "markInProgress",
   ])
   assert.deepEqual(context.savedTickets, [readyTicket, retryTicket])
   assert.deepEqual(context.assignedTickets, [readyTicket])
@@ -109,16 +109,18 @@ test("runOnce trusts database ordering and accepts Retry as conceptually ready",
   assert.equal(retryTicket.status, "Retry")
 })
 
-test("runOnce still queries local ready tickets when Vikunja returns no cards", async () => {
+test("runOnce synchronizes an empty board and does not assign absent tickets", async () => {
   const context = setup()
   context.vikunja.getTickets = async () => []
+  context.database.getReadyTickets = async () => []
 
   await context.scheduler.runOnce()
   assert.deepEqual(context.savedTickets, [])
-  assert.deepEqual(context.assignedTickets, [readyTicket])
+  assert.deepEqual(context.assignedTickets, [])
+  assert.ok(context.events.includes("syncTickets"))
 })
 
-for (const stage of ["getTickets", "saveTicket", "getReadyTickets", "assignTicket", "markInProgress"] as const) {
+for (const stage of ["getTickets", "syncTickets", "getReadyTickets", "assignTicket", "markInProgress"] as const) {
   test(`runOnce propagates ${stage} errors and stops the pass`, async () => {
     const context = setup()
     const error = new Error(`${stage} failed`)
@@ -129,7 +131,7 @@ for (const stage of ["getTickets", "saveTicket", "getReadyTickets", "assignTicke
 
     switch (stage) {
       case "getTickets": context.vikunja.getTickets = fail; break
-      case "saveTicket": context.database.saveTicket = fail; break
+      case "syncTickets": context.database.syncTickets = fail; break
       case "getReadyTickets": context.database.getReadyTickets = fail; break
       case "assignTicket": context.agentManager.assignTicket = fail; break
       case "markInProgress": context.vikunja.markInProgress = fail; break

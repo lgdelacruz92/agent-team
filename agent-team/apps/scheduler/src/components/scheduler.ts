@@ -14,9 +14,7 @@ export class Scheduler implements SchedulerInterface {
   async runOnce(): Promise<void> {
     const tickets = await this.vikunja.getTickets()
 
-    for (const ticket of tickets) {
-      await this.database.saveTicket(ticket)
-    }
+    await this.database.syncTickets(tickets)
 
     // Trust the database's readiness rules and ordering; attempt one ticket per pass.
     const readyTickets = await this.database.getReadyTickets()

@@ -4,6 +4,7 @@ import type { VikunjaTicket } from "./vikunja.interface.js"
 // The local ID identifies the ticket inside the scheduler database.
 export interface SchedulerTicket extends VikunjaTicket {
   id: number
+  presentOnBoard: boolean
 }
 
 export interface Assignment {
@@ -25,10 +26,10 @@ export interface NewAssignment {
 }
 
 export interface SchedulerDatabaseInterface {
-  // Insert a ticket or update the existing one with the same Vikunja task ID, preserving its local ID.
-  saveTicket(ticket: VikunjaTicket): Promise<SchedulerTicket>
+  // Atomically reconcile a complete successful board fetch, preserving missing ticket records.
+  syncTickets(tickets: VikunjaTicket[]): Promise<void>
 
-  // Return Ready and Retry tickets in local ID order, preserving their stored statuses.
+  // Return present Ready and Retry tickets in local ID order, preserving their stored statuses.
   getReadyTickets(): Promise<SchedulerTicket[]>
 
   // Create the assignment and update the local ticket atomically without changing agent status.

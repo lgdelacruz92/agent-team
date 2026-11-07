@@ -22,7 +22,8 @@ export function openDatabase(path: string): DatabaseSync {
         vikunja_task_id INTEGER NOT NULL UNIQUE,
         title TEXT NOT NULL,
         status TEXT NOT NULL,
-        priority INTEGER NOT NULL
+        priority INTEGER NOT NULL,
+        present_on_board INTEGER NOT NULL DEFAULT 0 CHECK (present_on_board IN (0, 1))
       ) STRICT;
 
       CREATE TABLE IF NOT EXISTS agents (
@@ -43,6 +44,19 @@ export function openDatabase(path: string): DatabaseSync {
       CREATE INDEX IF NOT EXISTS assignments_ticket_id ON assignments(ticket_id);
       CREATE INDEX IF NOT EXISTS assignments_agent_id ON assignments(agent_id);
     `)
+
+    // Existing databases have no presence information until the next successful sync.
+    database.exec("BEGIN IMMEDIATE")
+    try {
+      const columns = database.prepare("PRAGMA table_info(tickets)").all()
+      if (!columns.some((column) => column.name === "present_on_board")) {
+        database.exec("ALTER TABLE tickets ADD COLUMN present_on_board INTEGER NOT NULL DEFAULT 0 CHECK (present_on_board IN (0, 1))")
+      }
+      database.exec("COMMIT")
+    } catch (error) {
+      database.exec("ROLLBACK")
+      throw error
+    }
   } catch (error) {
     database.close()
     throw error
