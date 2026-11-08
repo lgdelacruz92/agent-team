@@ -1,6 +1,6 @@
 # Agent resource manager session context
 
-Estimated reading time: 52 minutes (150 WPM)
+Estimated reading time: 53 minutes (150 WPM)
 
 ## Working agreement
 
@@ -182,3 +182,4 @@ Estimated reading time: 52 minutes (150 WPM)
 - User requested manual seed and drop SQL for the shared database. Added `../../shared-db/seed.sql` for all five tables and `../../shared-db/drop.sql` to remove them in dependency order. The seed is for a new database and deliberately does not insert actual agents; a human must add and validate them. The drop is destructive and must not be run on a user database without their deliberate action. Documented `sqlite3 -bail` usage; tested against isolated databases only.
 - User requested that `../../shared-db/agents.sql` insert an `idle` frontend agent at `localhost:4098`. Added the row with `http://localhost:4098`, since the agent client needs a URL scheme. This is a plain insert and will add a duplicate if run more than once; it was not run against the user's database.
 - User asked how to run the SQL file with SQLite. Provided the manual `sqlite3 -bail <database-path> < shared-db/agents.sql` command and noted that rerunning inserts a duplicate. No database was changed.
+- User requested the Resource Manager and Ticket Scheduler use `shared-db/db.sqlite` as their shared database. Both apps now default to that same file independently of the working directory. Their existing `RESOURCE_MANAGER_DB_PATH` and `SCHEDULER_DB_PATH` overrides remain available and can point them elsewhere, so both must be kept aligned. Config tests do not open the database; no user database was changed and no services were started.

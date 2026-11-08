@@ -1,7 +1,10 @@
 // Reads the settings for the Resource Manager's agent-check loop.
 import { resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 
-const _databasePath = process.env.RESOURCE_MANAGER_DB_PATH
+// Resolve relative to the app, not the directory from which it was started.
+const defaultDatabasePath = fileURLToPath(new URL("../../shared-db/db.sqlite", import.meta.url))
+const _databasePath = process.env.RESOURCE_MANAGER_DB_PATH ?? defaultDatabasePath
 const _pollMs = Number(process.env.RESOURCE_MANAGER_POLL_MS ?? "30000")
 const _opencodeUser = process.env.OPENCODE_SERVER_USERNAME ?? "opencode"
 const _opencodePassword = process.env.OPENCODE_SERVER_PASSWORD ?? ""

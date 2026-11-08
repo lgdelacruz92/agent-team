@@ -1,9 +1,12 @@
 // Reads configuration for the standalone scheduler scaffold.
 import { resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 
+// Resolve relative to the app, not the directory from which it was started.
+const defaultDatabasePath = fileURLToPath(new URL("../../shared-db/db.sqlite", import.meta.url))
 const _host = process.env.HOST ?? "127.0.0.1"
 const _port = Number(process.env.PORT ?? "3300")
-const _databasePath = resolve(process.env.SCHEDULER_DB_PATH ?? "data/scheduler.sqlite")
+const _databasePath = resolve(process.env.SCHEDULER_DB_PATH ?? defaultDatabasePath)
 const _pollMs = Number(process.env.SCHEDULER_POLL_MS ?? "30000")
 const _assignmentWarningMs = Number(process.env.SCHEDULER_ASSIGNMENT_WARNING_MS ?? "600000")
 const _maxAttempts = Number(process.env.SCHEDULER_MAX_ATTEMPTS ?? "3")

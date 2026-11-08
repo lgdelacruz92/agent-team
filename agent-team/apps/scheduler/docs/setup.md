@@ -20,7 +20,7 @@ Replace the example path with the existing database path. The script does not cr
 
 For cross-app integration, the shared database also needs the agent's OpenCode URL. See [shared data reference](shared-data.md). The older scheduler seed does not add that URL or provide a complete database setup.
 
-Point `SCHEDULER_DB_PATH` at the existing database. Its default is `data/scheduler.sqlite` relative to the scheduler's working directory. The path must resolve to the same file the Resource Manager will use. SQLite WAL is the current same-host proof-of-concept choice; ensure both processes can access the database and its directory.
+Both apps default to `agent-team/apps/shared-db/db.sqlite`, independently of their working directory. `SCHEDULER_DB_PATH` overrides the scheduler's path, and `RESOURCE_MANAGER_DB_PATH` overrides the Resource Manager's. If either is overridden, ensure both resolve to the same existing file. SQLite WAL is the current same-host proof-of-concept choice; ensure both processes can access the database and its directory.
 
 On startup, the scheduler checks its original table columns and fails if the file is missing or those columns are unavailable. This check does not validate every constraint or the execution and lock tables. A missing lock table makes passes fail; a missing execution table makes a `Retry` count fail. The scheduler's lock, retry checks, and flagging are implemented, but Resource Manager integration is not. The Vikunja board must have exactly one column named `Flagged tickets`.
 

@@ -2,7 +2,7 @@
 
 Estimated reading time: 12 minutes (150 WPM)
 
-Standalone TypeScript Express app with SQLite persistence, local agent assignment, and Vikunja Kanban fetching. `index.ts` runs `Scheduler.runOnce()` continuously. Assignment reserves a local agent; it does not start an OpenCode session or move a card. The scheduler moves exhausted retries to `Flagged tickets`; the future resource manager will handle execution and other lifecycle card moves. The resource manager is not implemented. The existing `frontend-ctr` stays separate.
+Standalone TypeScript Express app with SQLite persistence, local agent assignment, and Vikunja Kanban fetching. `index.ts` runs `Scheduler.runOnce()` continuously. Assignment reserves a local agent; it does not start an OpenCode session or move a card. The scheduler moves exhausted retries to `Flagged tickets`. The Resource Manager checks agents, but execution and other lifecycle card moves are not implemented yet. The existing `frontend-ctr` stays separate.
 
 ## Run
 
@@ -21,7 +21,7 @@ Defaults to `http://127.0.0.1:3300`. No authentication: keep it local.
 
 - `HOST`: default `127.0.0.1`.
 - `PORT`: default `3300`.
-- `SCHEDULER_DB_PATH`: default `data/scheduler.sqlite`, relative to the working directory.
+- `SCHEDULER_DB_PATH`: override for the shared database; default `apps/shared-db/db.sqlite`, independent of the working directory. The Resource Manager uses the same default.
 - `SCHEDULER_POLL_MS`: wait after each completed pass, default `30000` (30 seconds). Must be an integer from 1 through 2147483647.
 - `SCHEDULER_ASSIGNMENT_WARNING_MS`: age at which to warn about an incomplete `assigned` record, and minimum time between repeated warnings. Default `600000` (10 minutes); must be a positive safe integer.
 - `SCHEDULER_MAX_ATTEMPTS`: total attempts allowed, including the first; defaults to `3` and must be a positive safe integer. An exhausted `Retry` ticket is moved to `Flagged tickets` instead of being assigned.
@@ -100,7 +100,7 @@ The scheduler assumes the `agents` table is already populated with valid real ag
 For local testing, an agent can be inserted through `AgentStore`, for example:
 
 ```ts
-const database = openDatabase("data/scheduler.sqlite")
+const database = openDatabase("../shared-db/db.sqlite")
 try {
   new AgentStore(database).create({ name: "frontend-1", status: "idle" })
 } finally {
@@ -108,7 +108,7 @@ try {
 }
 ```
 
-Use the imports shown below. This example generates an ID locally; it does not provision a real agent or ensure the generated ID matches one. The name is not an OpenCode endpoint. Do not run it every pass; agent names are not unique.
+Use the imports shown below. This example generates an ID locally but does not populate the OpenCode URL required by the Resource Manager or provision a real agent. The name is not an endpoint. Do not run it every pass; agent names are not unique.
 
 ### Intended watcher contract
 
@@ -141,7 +141,7 @@ import { TicketStore } from "./src/db/ticket-store.js"
 import { AgentStore } from "./src/db/agent-store.js"
 import { AssignmentStore } from "./src/db/assignment-store.js"
 
-const database = openDatabase("data/scheduler.sqlite")
+const database = openDatabase("../shared-db/db.sqlite")
 const tickets = new TicketStore(database)
 const agents = new AgentStore(database)
 const assignments = new AssignmentStore(database)

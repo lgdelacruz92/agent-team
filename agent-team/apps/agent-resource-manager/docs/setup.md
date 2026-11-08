@@ -26,8 +26,8 @@ sqlite3 -bail /absolute/path/to/shared.sqlite < shared-db/drop.sql
 
 The scheduler's [setup guide](../../scheduler/docs/setup.md) also describes its older manual seed, which creates only the execution and lock tables in an already prepared database.
 
-Configure both apps to access the same database file and its directory. The scheduler uses `SCHEDULER_DB_PATH`; see its [setup guide](../../scheduler/docs/setup.md). SQLite WAL is the current same-host proof-of-concept choice.
+Both apps default to `agent-team/apps/shared-db/db.sqlite`, regardless of their working directory. The scheduler's `SCHEDULER_DB_PATH` and the Resource Manager's `RESOURCE_MANAGER_DB_PATH` override their respective defaults. If either is overridden, ensure both resolve to the same file and can access its directory. SQLite WAL is the current same-host proof-of-concept choice.
 
-Set `RESOURCE_MANAGER_DB_PATH` to the existing shared database file. The Resource Manager requires the `agents` table to have `id`, `name`, `status`, and `url` columns; it does not create or migrate them. Starting it immediately checks registered URLs and can set unreachable agents to `needs_review`. Its 30-second default check interval can be changed with `RESOURCE_MANAGER_POLL_MS`.
+The shared database file must already exist. The Resource Manager requires the `agents` table to have `id`, `name`, `status`, and `url` columns; it does not create or migrate them. Starting it immediately checks registered URLs and can set unreachable agents to `needs_review`. Its 30-second default check interval can be changed with `RESOURCE_MANAGER_POLL_MS`.
 
 The current database adapter only reads agents and updates their statuses. Setting up a database alone does not make the apps work together; the manager still needs execution tracking and must use the scheduler's `ticket-scheduling` lock for coordinated completion.

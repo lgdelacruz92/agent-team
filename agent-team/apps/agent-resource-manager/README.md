@@ -10,11 +10,12 @@ Requires Node.js 22.13 or newer.
 
 ```sh
 npm install
-export RESOURCE_MANAGER_DB_PATH=/absolute/path/to/shared.sqlite
 npm run dev
 ```
 
 Starting the app immediately contacts registered agents and can change their database status to `needs_review`. It checks again every 30 seconds by default; `RESOURCE_MANAGER_POLL_MS` changes the interval. Stop it with Ctrl+C. To run the compiled app, use `npm run build` followed by `npm start`. Run tests with `npm test`.
+
+The default database is `apps/shared-db/db.sqlite`, shared with the Ticket Scheduler. `RESOURCE_MANAGER_DB_PATH` overrides it; if either app is overridden, ensure both still point to the same file.
 
 Set `OPENCODE_SERVER_PASSWORD` and, if needed, `OPENCODE_SERVER_USERNAME` for Basic authentication; the username defaults to `opencode`. These credentials are used for every registered server. A human must prepare the shared database and its agent rows first; see [setup](docs/setup.md).
 
