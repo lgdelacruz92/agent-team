@@ -71,6 +71,8 @@ The agreed direction is to log the execution and session IDs immediately before 
 
 The assignment already links to a ticket and an agent, so their IDs need not be repeated in the execution record. The agent's URL and availability belong in the `agents` table, separate from execution history. The current `agents` table does not yet have a URL field.
 
+The user decided a human is responsible for prepopulating the `agents` table and ensuring its entries are valid at startup. The Resource Manager will still observe agents during operation and flag unreachable agents for human review. How the human prepares and validates the rows remains to be worked out.
+
 ## Completion coordination
 
 The Resource Manager holds the shared lock while moving a ticket to `Done` or `Retry` and marking the assignment complete in SQLite. The Ticket Scheduler holds the same lock across its board fetch, ticket sync, and scheduling pass. This prevents an overlapping scheduler pass from using an older board fetch as the assignment is released.

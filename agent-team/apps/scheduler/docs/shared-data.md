@@ -32,6 +32,7 @@ erDiagram
 - Execution statuses: `starting`, `running`, `succeeded`, and `failed`.
 - An execution links to an assignment, which links to its ticket and agent. Count an attempt only when `work_requested_at` is recorded. The first attempt counts as 1.
 - The planned agent data keeps numeric `agents.id` and adds the OpenCode server URL. The scheduler relies on the agent status stored in the table.
+- A human is responsible for prepopulating the `agents` table and ensuring its entries are valid at startup. The preparation and validation procedure remains to be worked out; the Resource Manager is intended to monitor agents during operation.
 - A lock is acquired by atomically inserting its unique name and owner token, and released only when both match. The scheduler uses the name `ticket-scheduling`; the Resource Manager must use the same name and protocol. A held lock means retry on a later tick. Potentially stale locks are left for human review.
 - The scheduler holds the lock across board fetch, sync, and scheduling. The agreed Resource Manager direction is to hold the same lock across the final card move and assignment completion; that side is not yet implemented.
 

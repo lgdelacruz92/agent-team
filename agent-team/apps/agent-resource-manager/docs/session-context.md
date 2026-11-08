@@ -1,6 +1,6 @@
 # Agent resource manager session context
 
-Estimated reading time: 49 minutes (150 WPM)
+Estimated reading time: 50 minutes (150 WPM)
 
 ## Working agreement
 
@@ -174,3 +174,5 @@ Estimated reading time: 49 minutes (150 WPM)
 - User requested implementing OpenCode agent `state()`. Added an isolated `OpencodeAgent` that checks the paginated OpenCode session list and uses busy and idle timestamps, following the existing frontend controller's approach. It reports network failures and timeouts as `unreachable`, and HTTP errors, invalid responses, and invalid URLs as `unknown`; it accepts optional request headers for authentication. The default 30-second request timeout follows the existing controller and is not the undecided execution timeout. The other agent methods explicitly throw until implemented, and the idle loop remains unwired. Added mocked tests; no live agents were contacted. Session timestamps and API compatibility with the deployed image still need controlled verification before dispatch.
 - User questioned whether `OpencodeAgentInterface` is really an agent manager managing multiple agents. Clarified that each `OpencodeAgent` represents one OpenCode server identified by its URL; its `state()` checks that server's sessions, not multiple server URLs. The planned Resource Manager coordinates multiple agents. No rename or design change was requested or decided.
 - User approved renaming the one-server client for clarity. Renamed the class to `OpencodeAgentClient`, its interface to `OpencodeAgentClientInterface`, and the associated source and test files. Behavior is unchanged; the Resource Manager still coordinates multiple agents and remains unimplemented.
+- User asked whether they had decided the agents table would be prepopulated with valid agents. The current Ticket Scheduler reads existing agent rows and does not provision agents, and setup is external. Previous notes do not explicitly record a decision about prepopulation or guarantee that rows are valid; the user posed this as a question, not a confirmed new decision. The planned agent URL is not yet in the current schema, and runtime reachability still needs observation.
+- User decided that a human is responsible for prepopulating the `agents` table and ensuring its entries are valid at startup. Recorded the decision in the Resource Manager data and setup documents and the Ticket Scheduler shared-data reference. The preparation and validation procedure was not specified; this does not replace planned runtime agent monitoring.
