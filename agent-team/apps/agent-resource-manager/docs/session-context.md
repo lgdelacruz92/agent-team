@@ -1,6 +1,6 @@
 # Agent resource manager session context
 
-Estimated reading time: 50 minutes (150 WPM)
+Estimated reading time: 52 minutes (150 WPM)
 
 ## Working agreement
 
@@ -10,7 +10,7 @@ Estimated reading time: 50 minutes (150 WPM)
 
 ## Where we left off
 
-- **Initial app started.** `src/interfaces/resource-manager.interface.ts` defines one reconciliation pass. `src/index.ts` starts an idle process loop without creating a Resource Manager. The Resource Manager class and its reconciliation behavior are not implemented yet. Continue modelling the app's entity interfaces.
+- **First agent-check slice implemented.** `ResourceManager.runOnce()` reads agent rows, checks each server, and flags unreachable agents `needs_review`; the non-overlapping loop repeats it. Assignment reconciliation and the remaining integrations are not implemented.
 - The user decided the manager will fetch the full ticket description from Vikunja and send it to the agent. The scheduler's ticket table stores the title but not the description. If fetching fails, keep the assignment reserved, retry, alert a human if the failure persists, and do not count it as an agent attempt. Other payload details and the alert threshold remain to be worked out.
 - Remaining A1 topics: identify and recover OpenCode sessions after uncertain starts or restarts; determine evidence of success, failure, and availability; and prevent another controller from dispatching to the same worker concurrently. Inspect the real OpenCode API and existing frontend controller rather than assuming their behavior.
 - Build iteratively, starting with entity interfaces. Resource Manager session tracking, shared database-lock coordination, and controlled cross-app tests remain necessary before real automatic dispatch and release. The timeout remains unset. The Ticket Scheduler now defaults to 3 total attempts, configurable. No real agents or infrastructure were started or changed in this session.
@@ -18,7 +18,7 @@ Estimated reading time: 50 minutes (150 WPM)
 
 ## Current state
 
-- The app has a runnable idle process loop and a standalone OpenCode server-wide `state()` implementation, but no Resource Manager implementation or wired integrations. No agent startup or infrastructure changes have been requested.
+- The loop uses the prepared shared SQLite database and OpenCode client for agent checks only. It does not start agents, reconcile assignments, dispatch work, or integrate with Vikunja.
 - Read the [shared data reference](../../scheduler/docs/shared-data.md) and this app's [data design](data.md) for agreed boundaries and the current scheduler behavior. Check the scheduler source before designing an integration.
 - The scheduler records assignments in shared SQLite. An incomplete assignment reserves its ticket and agent; it does not prove work has started.
 - The intended manager will reconcile real agent state, report progress, and move Vikunja cards. Lifecycle, recovery, and completion coordination have agreed directions; implementation details remain.
@@ -176,3 +176,7 @@ Estimated reading time: 50 minutes (150 WPM)
 - User approved renaming the one-server client for clarity. Renamed the class to `OpencodeAgentClient`, its interface to `OpencodeAgentClientInterface`, and the associated source and test files. Behavior is unchanged; the Resource Manager still coordinates multiple agents and remains unimplemented.
 - User asked whether they had decided the agents table would be prepopulated with valid agents. The current Ticket Scheduler reads existing agent rows and does not provision agents, and setup is external. Previous notes do not explicitly record a decision about prepopulation or guarantee that rows are valid; the user posed this as a question, not a confirmed new decision. The planned agent URL is not yet in the current schema, and runtime reachability still needs observation.
 - User decided that a human is responsible for prepopulating the `agents` table and ensuring its entries are valid at startup. Recorded the decision in the Resource Manager data and setup documents and the Ticket Scheduler shared-data reference. The preparation and validation procedure was not specified; this does not replace planned runtime agent monitoring.
+- User pointed to the first loop in the sequence diagram. It shows the planned Resource Manager checking each agent every tick and marking unreachable agents unavailable for human review. No diagram or implementation change was requested.
+- User clarified they are implementing the sequence diagram's first agent-check loop and asked what comes after the client `state()` method. The next slice is a testable Resource Manager pass that obtains agents through `listAgents()`, calls a client for each URL, and records unreachable agents through `updateAgentStatus()`. The exact review status remains undecided; the database adapter and actual loop wiring are not implemented. No implementation was requested in this prompt.
+- User chose `needs_review` as the unreachable-agent flag and requested the agent-check pass, tests, and loop wiring. Implemented a partial Resource Manager, the agent-only SQLite adapter, configured OpenCode clients, and a non-overlapping retrying loop. A human must set `RESOURCE_MANAGER_DB_PATH` to an existing database containing the agent URL column; startup contacts agents and can update statuses. Unknown responses and missing URLs are logged without changing status, and `needs_review` is not automatically cleared. Tests use fake HTTP and in-memory SQLite; no live agents or user database were touched. Assignment reconciliation, execution tracking, and other integrations remain unimplemented.
+- User requested manual seed and drop SQL for the shared database. Added `../../shared-db/seed.sql` for all five tables and `../../shared-db/drop.sql` to remove them in dependency order. The seed is for a new database and deliberately does not insert actual agents; a human must add and validate them. The drop is destructive and must not be run on a user database without their deliberate action. Documented `sqlite3 -bail` usage; tested against isolated databases only.

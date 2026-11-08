@@ -2,7 +2,7 @@
 
 Estimated reading time: 3 minutes (150 WPM)
 
-The Ticket Scheduler flow is implemented. Resource Manager actions are the agreed direction, not implemented behavior; the current manager loop is idle. This diagram omits some restart cases; see the [data design](data.md) for those decisions.
+The Ticket Scheduler flow and the first Resource Manager agent-check loop are implemented. The remaining Resource Manager actions are the agreed direction, not implemented behavior. This diagram omits some restart cases; see the [data design](data.md) for those decisions.
 
 ## One assignment
 
@@ -20,11 +20,11 @@ sequenceDiagram
         participant H as Human monitor
     end
 
-    loop Each planned Resource Manager tick for every agent
+    loop Each Resource Manager tick for every agent
         RM->>A: Check agent status
         A-->>RM: Observed status or unreachable
         opt Agent is unreachable
-            RM->>DB: Mark agent unavailable and flag for human review
+            RM->>DB: Set status to needs_review
         end
     end
 

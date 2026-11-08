@@ -1,12 +1,19 @@
-// Runs the app's idle process loop until shutdown is requested.
+// Runs non-overlapping Resource Manager passes until shutdown is requested.
 import { setTimeout } from "node:timers/promises"
+import type { ResourceManagerInterface } from "./interfaces/resource-manager.interface.js"
 
-// Keep the process alive without starting any Resource Manager work yet.
-export async function runProcessLoop(signal: AbortSignal): Promise<void> {
-  const pollMs = 30_000
-
+// A failed pass is logged and retried on the next tick.
+export async function runProcessLoop(manager: ResourceManagerInterface, pollMs: number, signal: AbortSignal): Promise<void> {
   while (!signal.aborted) {
-    console.log("Resource Manager loop: idle")
+    try {
+      await manager.runOnce()
+    } catch (error) {
+      console.error("Resource Manager pass failed:", error)
+    }
+
+    if (signal.aborted) {
+      return
+    }
 
     try {
       await setTimeout(pollMs, undefined, { signal })

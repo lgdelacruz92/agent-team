@@ -8,7 +8,9 @@ Someone must set up the shared SQLite database before the Ticket Scheduler and R
 
 The current scheduler requires the existing `tickets`, `agents`, and `assignments` tables and their expected columns. See [current scheduler table models](../src/db/stores-doc.md). The database must preserve their unique and foreign-key relationships, including `tickets.vikunja_task_id` and assignment references. `tickets.present_on_board` must exist; older databases are not automatically migrated.
 
-The scheduler requires the `locks` and `executions` tables for coordination and retry checks. After the existing scheduler tables are set up, a person can create the two shared tables by running this from `apps/scheduler`:
+For a new shared database, use the manual [shared seed.sql](../../shared-db/seed.sql) to create all five tables, including the agent URL. See the [Resource Manager setup](../../agent-resource-manager/docs/setup.md) for commands and the destructive drop script. A human must populate and validate the agent rows; the seed does not insert real agents. It is not a migration for an existing database.
+
+The scheduler also has an older seed for just the `locks` and `executions` tables. After the existing scheduler tables are set up, a person can run this from `apps/scheduler`:
 
 ```sh
 npm run seed -- /absolute/path/to/scheduler.sqlite
@@ -16,7 +18,7 @@ npm run seed -- /absolute/path/to/scheduler.sqlite
 
 Replace the example path with the existing database path. The script does not create the database or the `tickets`, `agents`, and `assignments` tables. It creates the two shared tables if missing, checks an existing table for required fields and constraints, and leaves existing rows intact. If an existing table is incompatible, it fails and rolls back rather than migrating it. Do not run it against a live database until you have checked the path and schema.
 
-For the planned cross-app integration, the shared database also needs the agent's OpenCode URL. See [shared data reference](shared-data.md). The seed script does not add that URL or provide a complete database setup. Do not treat the test fixture as a production setup script.
+For cross-app integration, the shared database also needs the agent's OpenCode URL. See [shared data reference](shared-data.md). The older scheduler seed does not add that URL or provide a complete database setup.
 
 Point `SCHEDULER_DB_PATH` at the existing database. Its default is `data/scheduler.sqlite` relative to the scheduler's working directory. The path must resolve to the same file the Resource Manager will use. SQLite WAL is the current same-host proof-of-concept choice; ensure both processes can access the database and its directory.
 

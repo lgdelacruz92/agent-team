@@ -1,6 +1,6 @@
 # Resource Manager setup
 
-Estimated reading time: 2 minutes (150 WPM)
+Estimated reading time: 3 minutes (150 WPM)
 
 ## Shared database prerequisite
 
@@ -8,8 +8,26 @@ Someone must set up the shared SQLite database before the Resource Manager and T
 
 A human is responsible for prepopulating the `agents` table and making sure its entries are valid at startup. The preparation and validation procedure has not been specified. The Resource Manager is still intended to monitor agents during operation; startup validity does not guarantee continued reachability.
 
-The existing scheduler expects `tickets`, `agents`, and `assignments` with the fields and relationships in its [table models](../../scheduler/src/db/stores-doc.md). The planned integration also requires `executions`, `locks`, and the agent's OpenCode URL, as described in the [Resource Manager data design](data.md) and the scheduler's [shared data reference](../../scheduler/docs/shared-data.md). The scheduler's [setup guide](../../scheduler/docs/setup.md) describes a manually run script for the execution and lock tables; it does not create the original tables or add the agent URL. No complete shared-database setup script is provided yet.
+The existing scheduler expects `tickets`, `agents`, and `assignments` with the fields and relationships in its [table models](../../scheduler/src/db/stores-doc.md). The integration also requires `executions`, `locks`, and the agent's OpenCode URL, as described in the [Resource Manager data design](data.md) and the scheduler's [shared data reference](../../scheduler/docs/shared-data.md).
+
+For a **new** database, the manual [seed.sql](../../shared-db/seed.sql) creates all five tables. From `agent-team/apps`, run:
+
+```sh
+sqlite3 -bail /absolute/path/to/new.sqlite < shared-db/seed.sql
+```
+
+SQLite 3.37 or newer is required. The script does not migrate existing tables and stops if any already exist. The human must then add and validate real agent rows; the example in the SQL file is commented out. Set `idle` only for agents ready for scheduling, with URLs the Resource Manager can reach.
+
+The separate [drop.sql](../../shared-db/drop.sql) permanently deletes all five tables and their contents. Stop both apps and back up the database before running it. From `agent-team/apps`:
+
+```sh
+sqlite3 -bail /absolute/path/to/shared.sqlite < shared-db/drop.sql
+```
+
+The scheduler's [setup guide](../../scheduler/docs/setup.md) also describes its older manual seed, which creates only the execution and lock tables in an already prepared database.
 
 Configure both apps to access the same database file and its directory. The scheduler uses `SCHEDULER_DB_PATH`; see its [setup guide](../../scheduler/docs/setup.md). SQLite WAL is the current same-host proof-of-concept choice.
 
-The Resource Manager currently runs an idle loop and has no database integration or database-path configuration. Setting up a database alone does not make the apps work together; the manager still needs execution tracking and must use the scheduler's `ticket-scheduling` lock for coordinated completion.
+Set `RESOURCE_MANAGER_DB_PATH` to the existing shared database file. The Resource Manager requires the `agents` table to have `id`, `name`, `status`, and `url` columns; it does not create or migrate them. Starting it immediately checks registered URLs and can set unreachable agents to `needs_review`. Its 30-second default check interval can be changed with `RESOURCE_MANAGER_POLL_MS`.
+
+The current database adapter only reads agents and updates their statuses. Setting up a database alone does not make the apps work together; the manager still needs execution tracking and must use the scheduler's `ticket-scheduling` lock for coordinated completion.

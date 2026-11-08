@@ -4,7 +4,7 @@ Estimated reading time: 4 minutes (150 WPM)
 
 This is a scheduler-side copy of the approved models in the [Resource Manager data design](../../agent-resource-manager/docs/data.md). Both apps are intended to use the same SQLite database and shared tables. Someone must set up the database; the Ticket Scheduler does not create or migrate tables at startup. A separate manual seed can create the shared tables. See [setup](setup.md).
 
-The existing database may not yet contain these tables or the planned agent URL. The models below are a design reference, not evidence that the database is ready. The seed script defines SQLite types for the execution and lock tables; it does not add the agent URL.
+An existing database may not yet contain these tables or the agent URL. The models below are a design reference, not evidence that the database is ready. The manual [shared seed](../../shared-db/seed.sql) creates all five tables for a new database; the older scheduler seed creates only the execution and lock tables and does not add the agent URL. Neither script populates real agents.
 
 ## Executions and locks
 
@@ -33,6 +33,7 @@ erDiagram
 - An execution links to an assignment, which links to its ticket and agent. Count an attempt only when `work_requested_at` is recorded. The first attempt counts as 1.
 - The planned agent data keeps numeric `agents.id` and adds the OpenCode server URL. The scheduler relies on the agent status stored in the table.
 - A human is responsible for prepopulating the `agents` table and ensuring its entries are valid at startup. The preparation and validation procedure remains to be worked out; the Resource Manager is intended to monitor agents during operation.
+- The Resource Manager agent-check loop marks unreachable agents `needs_review` and does not clear that status automatically. An unknown response or missing URL does not change the stored status; the scheduler may still select a row that remains `idle`.
 - A lock is acquired by atomically inserting its unique name and owner token, and released only when both match. The scheduler uses the name `ticket-scheduling`; the Resource Manager must use the same name and protocol. A held lock means retry on a later tick. Potentially stale locks are left for human review.
 - The scheduler holds the lock across board fetch, sync, and scheduling. The agreed Resource Manager direction is to hold the same lock across the final card move and assignment completion; that side is not yet implemented.
 

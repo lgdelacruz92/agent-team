@@ -2,16 +2,23 @@
 
 Estimated reading time: 2 minutes (150 WPM)
 
-This app will watch Ticket Scheduler assignments and reconcile real agent resources. Its initial process loop runs, but it does not load a Resource Manager or perform any work yet. An isolated OpenCode adapter implements server-wide `state()`; it is not wired into the loop, and its other operations are not implemented.
+This app will watch Ticket Scheduler assignments and reconcile real agent resources. Its current loop checks registered agents and flags unreachable ones, but does not dispatch work or reconcile assignments.
 
 ## Run
 
+Requires Node.js 22.13 or newer.
+
 ```sh
 npm install
+export RESOURCE_MANAGER_DB_PATH=/absolute/path/to/shared.sqlite
 npm run dev
 ```
 
-The loop logs that it is idle every 30 seconds. Stop it with Ctrl+C. To run the compiled app, use `npm run build` followed by `npm start`.
+Starting the app immediately contacts registered agents and can change their database status to `needs_review`. It checks again every 30 seconds by default; `RESOURCE_MANAGER_POLL_MS` changes the interval. Stop it with Ctrl+C. To run the compiled app, use `npm run build` followed by `npm start`. Run tests with `npm test`.
+
+Set `OPENCODE_SERVER_PASSWORD` and, if needed, `OPENCODE_SERVER_USERNAME` for Basic authentication; the username defaults to `opencode`. These credentials are used for every registered server. A human must prepare the shared database and its agent rows first; see [setup](docs/setup.md).
+
+Only an `unreachable` result sets `needs_review`. An `unknown` result or missing URL is logged and leaves the existing status unchanged, so the Ticket Scheduler may still select an agent whose stored status is `idle`. A recovered agent is not automatically cleared from `needs_review`.
 
 For the shared database prerequisite, see [setup](docs/setup.md).
 

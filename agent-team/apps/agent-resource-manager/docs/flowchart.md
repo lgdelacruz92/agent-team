@@ -2,7 +2,7 @@
 
 Estimated reading time: 2 minutes (150 WPM)
 
-The Ticket Scheduler side exists. The Resource Manager flow below is the agreed direction, not implemented behavior: its current loop is idle. See the [data design](data.md) for recovery and coordination details.
+The Ticket Scheduler side exists. The Resource Manager loop currently checks agents and flags unreachable ones; assignment and execution flows below remain planned. See the [data design](data.md) for recovery and coordination details.
 
 ## Big picture
 
@@ -11,7 +11,7 @@ flowchart LR
     V["Vikunja board"] -->|"fetch cards"| S["Ticket Scheduler<br/>(implemented)"]
     S -->|"sync tickets and reserve assignments"| DB[("Shared SQLite")]
     S -->|"flag exhausted retries"| V
-    DB -->|"read reservations"| RM["Resource Manager<br/>(planned)"]
+    DB -->|"read reservations"| RM["Resource Manager<br/>(partially implemented)"]
     RM -->|"record executions and state"| DB
     RM -->|"fetch descriptions and move cards"| V
     RM -->|"start and observe sessions"| A["OpenCode agent"]
@@ -67,4 +67,4 @@ flowchart LR
     Verify --> Joint["Test both apps together<br/>before real dispatch"]
 ```
 
-These are remaining milestones, not authorization to implement or start live agents. The shared tables need external setup; the available scheduler seed does not create the original tables or add the agent URL.
+These are remaining milestones, not authorization to implement or start live agents. The shared tables need external setup; the [shared seed](../../shared-db/seed.sql) creates them for a new database, but a human must populate and validate agent rows.
