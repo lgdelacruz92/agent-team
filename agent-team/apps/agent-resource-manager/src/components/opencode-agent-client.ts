@@ -17,78 +17,44 @@ export class OpencodeAgentClient implements OpencodeAgentClientInterface {
     private readonly timeoutMs: number = defaultTimeoutMs,
   ) {}
 
-  // A session is busy when its most recent busy time is newer than its idle time.
-  // Check every page: an older session can still be running.
+  // Active sessions reflect the current process, not stale persisted timestamps.
   async state(): Promise<OpencodeState> {
+    const active = await this.activeSessions()
+    return active.state === "ok" ? (active.ids.size > 0 ? "busy" : "idle") : active.state
+  }
+
+  private async activeSessions(): Promise<{ state: "ok"; ids: Set<string> } | { state: "unknown" | "unreachable" }> {
     const signal = AbortSignal.timeout(this.timeoutMs)
-    const seenCursors = new Set<string>()
-    let cursor: string | undefined
     let endpoint: URL
 
     try {
-      endpoint = new URL(`${this.url.replace(/\/+$/, "")}/api/session`)
+      endpoint = new URL(`${this.url.replace(/\/+$/, "")}/api/session/active`)
     } catch {
-      return "unknown"
+      return { state: "unknown" }
     }
 
-    while (true) {
-      if (cursor !== undefined) {
-        endpoint.searchParams.set("cursor", cursor)
-      }
-
-      let response: Response
-      try {
-        response = await fetch(endpoint, { headers: this.headers, signal })
-      } catch {
-        return "unreachable"
-      }
-
-      // An HTTP error means the server answered, but its state is not known.
-      if (!response.ok) {
-        return "unknown"
-      }
-
-      let body: unknown
-      try {
-        body = await response.json()
-      } catch {
-        if (signal.aborted) {
-          return "unreachable"
-        }
-        return "unknown"
-      }
-
-      if (!isRecord(body) || !Array.isArray(body.data) || !isRecord(body.cursor)) {
-        return "unknown"
-      }
-
-      for (const session of body.data) {
-        if (!isRecord(session) || typeof session.id !== "string" || !isRecord(session.time)) {
-          return "unknown"
-        }
-
-        const { busy, idle } = session.time
-        if ((busy !== undefined && (typeof busy !== "number" || !Number.isFinite(busy)))
-          || (idle !== undefined && (typeof idle !== "number" || !Number.isFinite(idle)))) {
-          return "unknown"
-        }
-
-        if (typeof busy === "number" && (idle === undefined || (typeof idle === "number" && idle < busy))) {
-          return "busy"
-        }
-      }
-
-      const next = body.cursor.next
-      if (next === undefined || next === null) {
-        return "idle"
-      }
-      if (typeof next !== "string" || next.length === 0 || seenCursors.has(next)) {
-        return "unknown"
-      }
-
-      seenCursors.add(next)
-      cursor = next
+    let response: Response
+    try {
+      response = await fetch(endpoint, { headers: this.headers, signal })
+    } catch {
+      return { state: "unreachable" }
     }
+    if (!response.ok) return { state: "unknown" }
+
+    let body: unknown
+    try {
+      body = await response.json()
+    } catch {
+      return { state: signal.aborted ? "unreachable" : "unknown" }
+    }
+    if (!isRecord(body) || !isRecord(body.data)) return { state: "unknown" }
+
+    const ids = new Set<string>()
+    for (const [id, activity] of Object.entries(body.data)) {
+      if (!id.startsWith("ses") || !isRecord(activity) || activity.type !== "running") return { state: "unknown" }
+      ids.add(id)
+    }
+    return { state: "ok", ids }
   }
 
   private async call(path: string, body?: unknown): Promise<Response> {
@@ -146,7 +112,9 @@ export class OpencodeAgentClient implements OpencodeAgentClientInterface {
         || (idle !== undefined && (typeof idle !== "number" || !Number.isFinite(idle)))) return withoutTimes("unknown")
       const busyAt = typeof busy === "number" ? busy : null
       const idleAt = typeof idle === "number" ? idle : null
-      return { state: busyAt !== null && (idleAt === null || idleAt < busyAt) ? "busy" : "idle", busyAt, idleAt }
+      const active = await this.activeSessions()
+      const state = active.state === "ok" ? (active.ids.has(sessionId) ? "busy" : "idle") : active.state
+      return { state, busyAt, idleAt }
     } catch {
       return withoutTimes("unknown")
     }

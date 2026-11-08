@@ -6,50 +6,89 @@ import { OpencodeAgentClient } from "../src/components/opencode-agent-client.js"
 const page = (data: unknown[], next: string | null = null) => ({ data, cursor: { next } })
 const session = (time: object) => ({ id: "ses_test", time })
 
-test("reports idle for an empty server and sessions that are no longer busy", async (t) => {
-  const responses = [page([]), page([session({}), session({ busy: 10, idle: 20 })])]
-  t.mock.method(globalThis, "fetch", async () => Response.json(responses.shift()))
+test("ignores stale busy timestamps when no session is active", async (t) => {
+  t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL) => {
+    return String(input).endsWith("/api/session/active")
+      ? Response.json({ data: {} })
+      : Response.json(page([session({ busy: 10 })]))
+  })
+
+  assert.equal(await new OpencodeAgentClient("http://opencode.test").state(), "idle")
+})
+
+test("reports a stale session as idle while preserving its timestamps", async (t) => {
+  t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL) => {
+    return String(input).endsWith("/api/session/active")
+      ? Response.json({ data: {} })
+      : Response.json({ data: { id: "ses_1", time: { busy: 10 } } })
+  })
+
+  assert.deepEqual(await new OpencodeAgentClient("http://opencode.test").sessionActivity("ses_1"),
+    { state: "idle", busyAt: 10, idleAt: null })
+})
+
+test("reports an active session as busy even if its last timestamps look idle", async (t) => {
+  t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL) => {
+    return String(input).endsWith("/api/session/active")
+      ? Response.json({ data: { ses_1: { type: "running" } } })
+      : Response.json({ data: { id: "ses_1", time: { busy: 10, idle: 20 } } })
+  })
+
+  assert.deepEqual(await new OpencodeAgentClient("http://opencode.test").sessionActivity("ses_1"),
+    { state: "busy", busyAt: 10, idleAt: 20 })
+})
+
+test("does not report a session busy just because another session is active", async (t) => {
+  t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL) => {
+    return String(input).endsWith("/api/session/active")
+      ? Response.json({ data: { ses_other: { type: "running" } } })
+      : Response.json({ data: { id: "ses_1", time: {} } })
+  })
+
+  const agent = new OpencodeAgentClient("http://opencode.test")
+  assert.equal(await agent.state(), "busy")
+  assert.equal(await agent.sessionState("ses_1"), "idle")
+})
+
+test("does not infer an idle session when the active endpoint fails", async (t) => {
+  let offline = false
+  t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL) => {
+    if (String(input).endsWith("/api/session/active")) {
+      if (offline) throw new Error("offline")
+      return Response.json({ data: { ses_other: { type: "unexpected" } } })
+    }
+    return Response.json({ data: { id: "ses_1", time: { busy: 10, idle: 20 } } })
+  })
+
+  const agent = new OpencodeAgentClient("http://opencode.test")
+  assert.equal(await agent.sessionState("ses_1"), "unknown")
+  offline = true
+  assert.equal(await agent.sessionState("ses_1"), "unreachable")
+})
+
+test("reports idle for an empty active-session map", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => Response.json({ data: {} }))
   const agent = new OpencodeAgentClient("http://opencode.test")
 
-  assert.equal(await agent.state(), "idle")
   assert.equal(await agent.state(), "idle")
 })
 
 test("reports busy when any session is still working", async (t) => {
-  const responses = [page([session({ busy: 10 })]), page([session({ busy: 30, idle: 20 })])]
-  t.mock.method(globalThis, "fetch", async () => Response.json(responses.shift()))
+  t.mock.method(globalThis, "fetch", async () => Response.json({ data: { ses_1: { type: "running" } } }))
   const agent = new OpencodeAgentClient("http://opencode.test")
 
   assert.equal(await agent.state(), "busy")
-  assert.equal(await agent.state(), "busy")
 })
 
-test("checks later pages and passes headers and the cursor", async (t) => {
-  const requests: Array<{ url: string; headers: Headers }> = []
+test("requests active sessions with the configured headers", async (t) => {
   t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
-    requests.push({ url: String(input), headers: new Headers(init?.headers) })
-    if (requests.length === 1) {
-      return Response.json(page([session({ busy: 10, idle: 20 })], "next page"))
-    }
-    return Response.json(page([session({ busy: 30 })]))
+    assert.equal(String(input), "http://opencode.test/api/session/active")
+    assert.equal(new Headers(init?.headers).get("authorization"), "Basic example")
+    return Response.json({ data: { ses_1: { type: "running" } } })
   })
   const agent = new OpencodeAgentClient("http://opencode.test/", { Authorization: "Basic example" })
 
   assert.equal(await agent.state(), "busy")
-  assert.equal(requests[0].url, "http://opencode.test/api/session")
-  assert.equal(new URL(requests[1].url).searchParams.get("cursor"), "next page")
-  assert.equal(requests[1].headers.get("authorization"), "Basic example")
-})
-
-test("returns idle only after the last page", async (t) => {
-  let calls = 0
-  t.mock.method(globalThis, "fetch", async () => {
-    calls += 1
-    return Response.json(calls === 1 ? page([], "next") : page([]))
-  })
-
-  assert.equal(await new OpencodeAgentClient("http://opencode.test").state(), "idle")
-  assert.equal(calls, 2)
 })
 
 test("reports unknown for HTTP errors, malformed JSON and invalid response shapes", async (t) => {
@@ -57,9 +96,9 @@ test("reports unknown for HTTP errors, malformed JSON and invalid response shape
     new Response("unauthorized", { status: 401 }),
     new Response("not JSON"),
     Response.json({ data: [] }),
-    Response.json(page([{}])),
-    Response.json(page([session({ busy: "10" })])),
-    Response.json({ data: [], cursor: { next: 42 } }),
+    Response.json({ data: { bad_id: { type: "running" } } }),
+    Response.json({ data: { ses_1: null } }),
+    Response.json({ data: { ses_1: { type: "idle" } } }),
   ]
   t.mock.method(globalThis, "fetch", async () => responses.shift()!)
   const agent = new OpencodeAgentClient("http://opencode.test")
@@ -69,25 +108,16 @@ test("reports unknown for HTTP errors, malformed JSON and invalid response shape
   }
 })
 
-test("reports unknown when a pagination cursor repeats", async (t) => {
-  t.mock.method(globalThis, "fetch", async () => Response.json(page([], "repeat")))
-
-  assert.equal(await new OpencodeAgentClient("http://opencode.test").state(), "unknown")
-})
-
-test("reports unknown when a later page fails or the URL is invalid", async (t) => {
+test("reports unknown when the active endpoint fails or the URL is invalid", async (t) => {
   let calls = 0
   t.mock.method(globalThis, "fetch", async () => {
     calls += 1
-    if (calls === 1) {
-      return Response.json(page([], "next"))
-    }
     return new Response("error", { status: 500 })
   })
 
   assert.equal(await new OpencodeAgentClient("http://opencode.test").state(), "unknown")
   assert.equal(await new OpencodeAgentClient("not a URL").state(), "unknown")
-  assert.equal(calls, 2)
+  assert.equal(calls, 1)
 })
 
 test("reports unreachable for a network failure", async (t) => {
@@ -112,7 +142,8 @@ test("reports unreachable when the request times out", async (t) => {
 test("creates, prompts, observes and interrupts a session", async (t) => {
   const requests: Array<{ url: string; init?: RequestInit }> = []
   const responses = [Response.json({ data: { id: "ses_1" } }), Response.json({}),
-    Response.json({ data: { id: "ses_1", time: { busy: 10 } } }), Response.json({})]
+    Response.json({ data: { id: "ses_1", time: { busy: 10 } } }),
+    Response.json({ data: { ses_1: { type: "running" } } }), Response.json({})]
   t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
     requests.push({ url: String(input), init })
     return responses.shift()!
@@ -122,7 +153,7 @@ test("creates, prompts, observes and interrupts a session", async (t) => {
   await agent.prompt("ses_1", "work")
   assert.equal(await agent.sessionState("ses_1"), "busy")
   await agent.abort("ses_1")
-  assert.deepEqual(requests.map((request) => request.url), ["http://opencode.test/api/session", "http://opencode.test/api/session/ses_1/prompt", "http://opencode.test/api/session/ses_1", "http://opencode.test/api/session/ses_1/interrupt"])
+  assert.deepEqual(requests.map((request) => request.url), ["http://opencode.test/api/session", "http://opencode.test/api/session/ses_1/prompt", "http://opencode.test/api/session/ses_1", "http://opencode.test/api/session/active", "http://opencode.test/api/session/ses_1/interrupt"])
   assert.deepEqual(JSON.parse(String(requests[1].init?.body)), { text: "work" })
   assert.equal(new Headers(requests[0].init?.headers).get("authorization"), "Basic example")
 })
@@ -142,8 +173,8 @@ test("distinguishes a missing session from HTTP errors and network failures", as
 })
 
 test("exposes validated session activity timestamps", async (t) => {
-  const responses = [Response.json({ data: { id: "ses_1", time: { busy: 10, idle: 20 } } }),
-    Response.json({ data: { id: "ses_1", time: {} } }),
+  const responses = [Response.json({ data: { id: "ses_1", time: { busy: 10, idle: 20 } } }), Response.json({ data: {} }),
+    Response.json({ data: { id: "ses_1", time: {} } }), Response.json({ data: {} }),
     Response.json({ data: { id: "ses_1", time: { busy: "bad" } } })]
   t.mock.method(globalThis, "fetch", async () => responses.shift()!)
   const agent = new OpencodeAgentClient("http://opencode.test")

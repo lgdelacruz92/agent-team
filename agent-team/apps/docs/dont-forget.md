@@ -2,7 +2,12 @@
 
 Estimated reading time: 2 minutes (150 WPM)
 
-## Before the first joint test
+## Where we left off
+
+- We left off testing the Ticket Scheduler and Agent Resource Manager together. A successful joint test run has not yet been confirmed.
+- Remember to implement regular session cleanup for agents. The cleanup mechanism and schedule have not been specified.
+
+## Before continuing the joint test
 
 - Starting the resource manager can dispatch real work and move cards. Use an isolated test board and agent workspace, and monitor the run. Don't start services without a request.
 - Set `VIKUNJA_PROJECT_ID` and `VIKUNJA_VIEW_ID` for the intended board in `.env.local`; the existing `CTR_*` IDs are different variable names and are not read by these apps.

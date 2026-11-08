@@ -187,6 +187,8 @@ services:
     env_file: ${ENV_FILE:-.env.local}
     environment:
       RESOURCE_MANAGER_DB_PATH: /shared-db/db.sqlite
+      VIKUNJA_PROJECT_ID: ${CTR_PROJECT_ID:-2}
+      VIKUNJA_VIEW_ID: ${CTR_VIEW_ID:-12}
     volumes:
       - ./shared-db:/shared-db
     extra_hosts:

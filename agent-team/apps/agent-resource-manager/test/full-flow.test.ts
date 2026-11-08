@@ -30,7 +30,7 @@ test("real adapters dispatch and complete through controlled HTTP endpoints", as
       }
     }
     if (url.host === "agent") {
-      if (url.pathname === "/api/session" && method === "GET") return Response.json({ data: [], cursor: { next: null } })
+      if (url.pathname === "/api/session/active" && method === "GET") return Response.json({ data: busy ? { ses_1: { type: "running" } } : {} })
       if (url.pathname === "/api/session" && method === "POST") return Response.json({ data: { id: "ses_1" } })
       if (url.pathname === "/api/session/ses_1/prompt") return Response.json({})
       if (url.pathname === "/api/session/ses_1") return Response.json({ data: { id: "ses_1", time: busy ? { busy: 2 } : { busy: 2, idle: 3 } } })

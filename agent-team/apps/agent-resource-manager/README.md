@@ -1,6 +1,6 @@
 # Agent resource manager
 
-Estimated reading time: 3 minutes (150 WPM)
+Estimated reading time: 4 minutes (150 WPM)
 
 This app checks registered agents and reconciles Ticket Scheduler assignments: fetches tasks, starts and observes OpenCode sessions, records executions, and moves cards before releasing reservations. The flow is tested with controlled services, not yet verified against the deployed APIs.
 
@@ -20,6 +20,8 @@ The default database is `apps/shared-db/db.sqlite`, shared with the Ticket Sched
 Set `VIKUNJA_URL`, `VIKUNJA_API_TOKEN`, `VIKUNJA_PROJECT_ID`, and `VIKUNJA_VIEW_ID` to the same board as the scheduler. Set `OPENCODE_SERVER_PASSWORD` and, if needed, `OPENCODE_SERVER_USERNAME` for Basic authentication; the username defaults to `opencode`. These credentials are used for every registered server. A human must prepare the shared database and its agent rows first; see [setup](docs/setup.md).
 
 `RESOURCE_MANAGER_EXECUTION_TIMEOUT_MS` optionally sets a positive execution timeout in milliseconds. No timeout is enabled by default; its value remains a human decision. Each task-fetch failure is logged to the terminal; no separate alert is needed for this prototype.
+
+Current activity comes from OpenCode's `/api/session/active`, which lists foreground sessions owned by that server process. Historical busy and idle timestamps are kept for detecting work completed between polls. If the active-session response is unavailable or invalid, the manager does not infer that the agent is idle.
 
 An unreachable agent or timed-out execution sets `needs_review`. An `unknown` result or missing URL leaves the existing status unchanged, so the Ticket Scheduler may still select an agent whose stored status is `idle`. A recovered agent is not automatically cleared from `needs_review`.
 
