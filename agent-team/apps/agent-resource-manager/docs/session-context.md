@@ -1,6 +1,6 @@
 # Agent resource manager session context
 
-Estimated reading time: 48 minutes (150 WPM)
+Estimated reading time: 49 minutes (150 WPM)
 
 ## Working agreement
 
@@ -18,7 +18,7 @@ Estimated reading time: 48 minutes (150 WPM)
 
 ## Current state
 
-- The app has a runnable idle process loop, but no Resource Manager implementation or integrations. No agent startup or infrastructure changes have been requested.
+- The app has a runnable idle process loop and a standalone OpenCode server-wide `state()` implementation, but no Resource Manager implementation or wired integrations. No agent startup or infrastructure changes have been requested.
 - Read the [shared data reference](../../scheduler/docs/shared-data.md) and this app's [data design](data.md) for agreed boundaries and the current scheduler behavior. Check the scheduler source before designing an integration.
 - The scheduler records assignments in shared SQLite. An incomplete assignment reserves its ticket and agent; it does not prove work has started.
 - The intended manager will reconcile real agent state, report progress, and move Vikunja cards. Lifecycle, recovery, and completion coordination have agreed directions; implementation details remain.
@@ -171,3 +171,4 @@ Estimated reading time: 48 minutes (150 WPM)
 - User requested `dont-forget.md` in both apps' docs for high-priority work left for later. The Resource Manager list captures the paused `runOnce()` work, remaining shared-data and coordination design, and integration checklist; the user explicitly identified the Ticket Scheduler's retry-limit handoff and missing features as priorities. No implementation was requested.
 - User resumed the Resource Manager project. Reviewed its documents and interfaces, plus the Ticket Scheduler's current handoff, shared-data documentation, and lock and retry implementation. The manager still runs only an idle loop; `runOnce()` remains paused pending the data and coordination discussion and user direction. The scheduler now implements its side of the shared lock and configurable attempt limit; its old handoffs and `dont-forget.md` were removed after that work. At the time, the Resource Manager's older proposal and diagrams contained stale details about decisions and scheduler implementation; the diagrams were updated afterward. No implementation, services, or infrastructure changes were requested.
 - User requested updating all Resource Manager diagrams. Updated the flowchart and sequence diagrams to distinguish implemented Ticket Scheduler behavior from the planned Resource Manager, show the agreed attempt counting and shared-lock completion flow, and identify deferred details. Updated the data diagram to match the scheduler's manual shared-table seed and corrected its outdated limit and lock notes. Parsed all five Mermaid diagrams successfully. No app implementation or infrastructure changes were made.
+- User requested implementing OpenCode agent `state()`. Added an isolated `OpencodeAgent` that checks the paginated OpenCode session list and uses busy and idle timestamps, following the existing frontend controller's approach. It reports network failures and timeouts as `unreachable`, and HTTP errors, invalid responses, and invalid URLs as `unknown`; it accepts optional request headers for authentication. The default 30-second request timeout follows the existing controller and is not the undecided execution timeout. The other agent methods explicitly throw until implemented, and the idle loop remains unwired. Added mocked tests; no live agents were contacted. Session timestamps and API compatibility with the deployed image still need controlled verification before dispatch.

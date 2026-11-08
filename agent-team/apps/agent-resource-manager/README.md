@@ -1,8 +1,8 @@
 # Agent resource manager
 
-Estimated reading time: 1 minute (150 WPM)
+Estimated reading time: 2 minutes (150 WPM)
 
-This app will watch Ticket Scheduler assignments and reconcile real agent resources. Its initial process loop runs, but it does not load a Resource Manager or perform any work yet.
+This app will watch Ticket Scheduler assignments and reconcile real agent resources. Its initial process loop runs, but it does not load a Resource Manager or perform any work yet. An isolated OpenCode adapter implements server-wide `state()`; it is not wired into the loop, and its other operations are not implemented.
 
 ## Run
 
