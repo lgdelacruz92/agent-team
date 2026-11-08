@@ -20,7 +20,7 @@ export interface Ticket {
   presentOnBoard: boolean
 }
 
-// The URL identifies the OpenCode server; existing database rows do not have it yet.
+// The URL identifies the OpenCode server; existing databases may need a schema update.
 export interface Agent {
   id: number
   name: string
@@ -43,7 +43,7 @@ export interface ResourceManagerDatabaseInterface {
   updateAssignmentStatus(assignmentId: number, status: string): Promise<void>
 
   // Release the reservation after the agreed completion coordination is satisfied.
-  // The shared lock and completion protocol still need to be designed.
+  // The agreed shared-lock and completion protocol is not implemented yet.
   completeAssignment(assignmentId: number, completedAt: string): Promise<void>
 
   // Report agent availability or flag an agent for human review.

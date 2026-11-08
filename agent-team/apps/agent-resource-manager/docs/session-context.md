@@ -33,5 +33,6 @@ Estimated reading time: 5 minutes (150 WPM)
 
 ## Recent context
 
+- User resumed the project to work on Agent Resource Manager. Rechecked its current code, scheduler boundary, and fresh shared seed; no services or implementation work were started. Updated database-interface comments to reflect the URL schema uncertainty and the agreed, not-yet-implemented manager-side lock protocol.
 - Resumed the project, checked source and shared SQL against the notes, and recorded the stale URL-column statement. No services or implementation work were started.
 - User requested a compact handoff to reduce resume context usage and asked the `project-resume` skill to exclude package directories such as `node_modules`. Full previous per-prompt history is preserved in [the archive](session-history-archive.md).
