@@ -33,7 +33,7 @@ Estimated reading time: 6 minutes (150 WPM)
 
 ## Recent context
 
-- User approved using session busy/idle timestamps to recognize work completed between polls. Implemented an in-memory pre-prompt baseline and validated newer completed intervals, including reused sessions and timeout cases. All 46 manager tests, the build, and application/test typechecks passed. Controlled tests do not establish deployed API compatibility.
+- User approved using session busy/idle timestamps to recognize work completed between polls. Implemented an in-memory pre-prompt baseline and validated newer completed intervals, including reused sessions and timeout cases. All 47 manager tests, the build, and application/test typechecks passed. Controlled tests do not establish deployed API compatibility.
 - User has a Vikunja server and knows how to hook it up; they asked to skip deployed API verification. This is not evidence the manager's deployed API assumptions were tested.
 - User wants to go through deployed API verification, fast-task readiness, and alerting/stale-lock recovery one item at a time, starting with deployed API verification.
 - User requested autonomous implementation of the full sequence flow for this session. Implemented the core reconciliation, integrations, recovery and locking. Verification: 40 manager tests and 101 scheduler tests passed; manager build and application/test typechecks passed. No live agents or user database were started or changed.

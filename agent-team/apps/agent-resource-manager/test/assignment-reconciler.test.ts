@@ -264,6 +264,21 @@ test("does not send work when the pre-send session activity cannot be observed",
   } finally { db.close() }
 })
 
+test("rechecks a reused session after fetching the task and before sending", async () => {
+  const { db, agent, vikunja, database, manager } = setup()
+  try {
+    const execution = await database.createExecution(1, "2026-01-01T00:00:00.000Z")
+    await database.saveSession(execution.id, "old")
+    vikunja.getTask = async (id) => {
+      agent.session = "busy"
+      return { id, title: "Task", description: "Work" }
+    }
+    await assert.rejects(manager.runOnce(), AggregateError)
+    assert.equal(agent.prompts.length, 0)
+    assert.equal((await database.getLatestExecution(1))?.workRequestedAt, null)
+  } finally { db.close() }
+})
+
 test("configured timeout flags and stops a stuck session", async () => {
   const { db, agent, database, manager } = setup(1)
   try {
