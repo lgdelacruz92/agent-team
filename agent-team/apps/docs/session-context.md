@@ -1,6 +1,6 @@
 # Apps project session context
 
-Estimated reading time: 7 minutes (150 WPM)
+Estimated reading time: 8 minutes (150 WPM)
 
 ## Working agreement
 
@@ -10,7 +10,7 @@ Estimated reading time: 7 minutes (150 WPM)
 
 ## Current focus
 
-We left off testing the Ticket Scheduler and Agent Resource Manager together. The user wants these notes at the `apps/` level because the work spans both projects and their parent setup.
+The user reports that the Ticket Scheduler worked with the frontend project ID. They want a `frontend-factory` that runs the frontend agent, scheduler, and Agent Resource Manager together from its own Compose folder and `.env.local`. A similar backend factory is planned later. These notes belong at the `apps/` level because the work spans both projects and their parent setup.
 
 The scheduler reserves tickets and agents in a shared SQLite database. The resource manager checks agents, dispatches assignments, and reconciles execution and card movement. Starting the manager can dispatch real work, change agent status, and move Vikunja cards. Do not start it merely to resume the project.
 
@@ -18,10 +18,12 @@ The resource manager's [session context](../agent-resource-manager/docs/session-
 
 ## Current state
 
+- `frontend-factory/docker-compose.yaml` defines the three services. `frontend-factory/db.sqlite` is a separate SQLite backup of the existing `shared-db/db.sqlite`; the original was not modified. Its local `.env.local` was copied from the apps-level file, with `VIKUNJA_PROJECT_ID` and `VIKUNJA_VIEW_ID` initialized from the existing frontend `CTR_*` settings.
+- All three factory images built and Compose configuration validated. One-off checks verified both app containers can read the copied database and board settings, and the frontend container can read its instructions and workspace. The factory itself has not been started; a joint test run has not been confirmed.
 - `docker-compose.yaml` includes `scheduler` and `agent-resource-manager`. Both use `${ENV_FILE:-.env.local}` and mount `shared-db/` at `/shared-db`; Compose sets both database paths to `/shared-db/db.sqlite`. The scheduler exposes port 3300 on localhost.
-- Both images built and Compose configuration validated. The user has since started the scheduler and resource manager; a successful joint test run has not been confirmed. The running manager uses the older code and logs the frontend agent as busy despite OpenCode reporting no active sessions.
-- `.env.local` contains `CTR_PROJECT_ID` and `CTR_VIEW_ID`, but not the `VIKUNJA_PROJECT_ID` and `VIKUNJA_VIEW_ID` read by these two apps. Both required Vikunja IDs are set in the running scheduler container; their source and the manager's settings have not been checked.
-- `shared-db/db.sqlite` exists, but its schema and agent rows have not been verified here. Both apps require an already prepared, shared database; neither creates or migrates the schema on startup.
+- The original scheduler, resource manager, and frontend containers were stopped when the factory was created. Don't run the original and factory schedulers against the same board simultaneously.
+- The original apps-level `.env.local` contains `CTR_PROJECT_ID` and `CTR_VIEW_ID`, while the factory's own `.env.local` also has the `VIKUNJA_*` IDs read by both apps.
+- Both databases passed SQLite's quick integrity check and contain a frontend agent. A complete schema and real agent validation have not been performed. Both apps require an already prepared, shared database; neither creates or migrates the schema on startup.
 - Controlled tests exist, but compatibility with deployed OpenCode and Vikunja APIs and cross-controller coordination remain unverified. The user previously chose to skip deployed API verification; that is not evidence it passed.
 
 ## Decisions and deferred work
@@ -30,10 +32,12 @@ The resource manager's [session context](../agent-resource-manager/docs/session-
 - **Decided:** Each agent reads the stable `agents/manifests.md` link. Compose mounts the `agents/` directory into each agent container, preserving the symlink. The current target, `agents/manifests/manifest.0.0.0.md`, instructs agents to work tickets in `/workspace`.
 - **Deferred:** The user plans to create a separate `coordination.md` describing agent collaboration. Its contents and location have not been specified.
 - **Deferred:** Implement regular session cleanup for agents. The mechanism and schedule have not been specified.
+- **Deferred:** Create a similar backend factory. Different boards require separate databases as well as the appropriate agent and board configuration; changing only the project ID is not enough if they share a database.
 - See [don't forget](dont-forget.md) for first-run reminders.
 
 ## Recent context
 
+- Created `frontend-factory/` with a local Compose file, environment copy, and isolated copy of the current shared database at the user's request. Built the images and checked configuration and mounts without starting the factory.
 - User asked to record where testing left off and to remember regular agent-session cleanup.
 - Fixed the resource manager's server-wide and session-specific current-state checks to use OpenCode's process-local `/api/session/active` endpoint; historical timestamps remain available for fast-task detection. Added regression and controlled-flow tests. The fixed client reported idle against the live frontend server with a read-only check; running services were not restarted.
 - Investigated the manager's repeated `Agent 1: busy` logs. Agent 1 points to the frontend server on host port 4098 and its database status is `idle`. The manager infers busy from any historical session with a busy timestamp but no later idle timestamp; one session from November 3 has no idle timestamp. OpenCode's `/api/session/active` reports zero active sessions. The manager's session-specific activity check uses the same timestamp assumption. No code or agent state was changed.
