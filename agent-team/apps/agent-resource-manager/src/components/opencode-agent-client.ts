@@ -1,5 +1,5 @@
 // Observes one OpenCode server; other agent operations are not implemented yet.
-import type { OpencodeAgentInterface, OpencodeState } from "../interfaces/opencode-agent.interface.js"
+import type { OpencodeAgentClientInterface, OpencodeState } from "../interfaces/opencode-agent-client.interface.js"
 
 // The frontend controller uses the same request timeout for OpenCode calls.
 const defaultTimeoutMs = 30_000
@@ -10,7 +10,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 // Reports the server's overall availability, independent of a particular assignment.
-export class OpencodeAgent implements OpencodeAgentInterface {
+export class OpencodeAgentClient implements OpencodeAgentClientInterface {
   constructor(
     readonly url: string,
     private readonly headers: Record<string, string> = {},
@@ -92,18 +92,18 @@ export class OpencodeAgent implements OpencodeAgentInterface {
   }
 
   async createSession(_title: string): Promise<string> {
-    throw new Error("OpencodeAgent.createSession is not implemented")
+    throw new Error("OpencodeAgentClient.createSession is not implemented")
   }
 
   async prompt(_sessionId: string, _text: string): Promise<void> {
-    throw new Error("OpencodeAgent.prompt is not implemented")
+    throw new Error("OpencodeAgentClient.prompt is not implemented")
   }
 
   async sessionState(_sessionId: string): Promise<OpencodeState> {
-    throw new Error("OpencodeAgent.sessionState is not implemented")
+    throw new Error("OpencodeAgentClient.sessionState is not implemented")
   }
 
   async abort(_sessionId: string): Promise<void> {
-    throw new Error("OpencodeAgent.abort is not implemented")
+    throw new Error("OpencodeAgentClient.abort is not implemented")
   }
 }

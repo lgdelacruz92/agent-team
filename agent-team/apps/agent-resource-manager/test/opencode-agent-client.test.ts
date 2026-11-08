@@ -1,7 +1,7 @@
 // Tests server-wide state without connecting to a real OpenCode server.
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { OpencodeAgent } from "../src/components/opencode-agent.js"
+import { OpencodeAgentClient } from "../src/components/opencode-agent-client.js"
 
 const page = (data: unknown[], next: string | null = null) => ({ data, cursor: { next } })
 const session = (time: object) => ({ id: "ses_test", time })
@@ -9,7 +9,7 @@ const session = (time: object) => ({ id: "ses_test", time })
 test("reports idle for an empty server and sessions that are no longer busy", async (t) => {
   const responses = [page([]), page([session({}), session({ busy: 10, idle: 20 })])]
   t.mock.method(globalThis, "fetch", async () => Response.json(responses.shift()))
-  const agent = new OpencodeAgent("http://opencode.test")
+  const agent = new OpencodeAgentClient("http://opencode.test")
 
   assert.equal(await agent.state(), "idle")
   assert.equal(await agent.state(), "idle")
@@ -18,7 +18,7 @@ test("reports idle for an empty server and sessions that are no longer busy", as
 test("reports busy when any session is still working", async (t) => {
   const responses = [page([session({ busy: 10 })]), page([session({ busy: 30, idle: 20 })])]
   t.mock.method(globalThis, "fetch", async () => Response.json(responses.shift()))
-  const agent = new OpencodeAgent("http://opencode.test")
+  const agent = new OpencodeAgentClient("http://opencode.test")
 
   assert.equal(await agent.state(), "busy")
   assert.equal(await agent.state(), "busy")
@@ -33,7 +33,7 @@ test("checks later pages and passes headers and the cursor", async (t) => {
     }
     return Response.json(page([session({ busy: 30 })]))
   })
-  const agent = new OpencodeAgent("http://opencode.test/", { Authorization: "Basic example" })
+  const agent = new OpencodeAgentClient("http://opencode.test/", { Authorization: "Basic example" })
 
   assert.equal(await agent.state(), "busy")
   assert.equal(requests[0].url, "http://opencode.test/api/session")
@@ -48,7 +48,7 @@ test("returns idle only after the last page", async (t) => {
     return Response.json(calls === 1 ? page([], "next") : page([]))
   })
 
-  assert.equal(await new OpencodeAgent("http://opencode.test").state(), "idle")
+  assert.equal(await new OpencodeAgentClient("http://opencode.test").state(), "idle")
   assert.equal(calls, 2)
 })
 
@@ -62,7 +62,7 @@ test("reports unknown for HTTP errors, malformed JSON and invalid response shape
     Response.json({ data: [], cursor: { next: 42 } }),
   ]
   t.mock.method(globalThis, "fetch", async () => responses.shift()!)
-  const agent = new OpencodeAgent("http://opencode.test")
+  const agent = new OpencodeAgentClient("http://opencode.test")
 
   for (let i = 0; i < 6; i += 1) {
     assert.equal(await agent.state(), "unknown")
@@ -72,7 +72,7 @@ test("reports unknown for HTTP errors, malformed JSON and invalid response shape
 test("reports unknown when a pagination cursor repeats", async (t) => {
   t.mock.method(globalThis, "fetch", async () => Response.json(page([], "repeat")))
 
-  assert.equal(await new OpencodeAgent("http://opencode.test").state(), "unknown")
+  assert.equal(await new OpencodeAgentClient("http://opencode.test").state(), "unknown")
 })
 
 test("reports unknown when a later page fails or the URL is invalid", async (t) => {
@@ -85,8 +85,8 @@ test("reports unknown when a later page fails or the URL is invalid", async (t) 
     return new Response("error", { status: 500 })
   })
 
-  assert.equal(await new OpencodeAgent("http://opencode.test").state(), "unknown")
-  assert.equal(await new OpencodeAgent("not a URL").state(), "unknown")
+  assert.equal(await new OpencodeAgentClient("http://opencode.test").state(), "unknown")
+  assert.equal(await new OpencodeAgentClient("not a URL").state(), "unknown")
   assert.equal(calls, 2)
 })
 
@@ -95,7 +95,7 @@ test("reports unreachable for a network failure", async (t) => {
     throw new Error("connection refused")
   })
 
-  assert.equal(await new OpencodeAgent("http://opencode.test").state(), "unreachable")
+  assert.equal(await new OpencodeAgentClient("http://opencode.test").state(), "unreachable")
 })
 
 test("reports unreachable when the request times out", async (t) => {
@@ -106,11 +106,11 @@ test("reports unreachable when the request times out", async (t) => {
     return Response.json(page([]))
   })
 
-  assert.equal(await new OpencodeAgent("http://opencode.test", {}, 10).state(), "unreachable")
+  assert.equal(await new OpencodeAgentClient("http://opencode.test", {}, 10).state(), "unreachable")
 })
 
 test("other agent operations fail explicitly until implemented", async () => {
-  const agent = new OpencodeAgent("http://opencode.test")
+  const agent = new OpencodeAgentClient("http://opencode.test")
 
   await assert.rejects(agent.createSession("title"), /not implemented/)
   await assert.rejects(agent.prompt("ses_test", "work"), /not implemented/)

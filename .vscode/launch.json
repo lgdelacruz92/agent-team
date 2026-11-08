@@ -29,6 +29,19 @@
       "sourceMaps": true,
       "console": "integratedTerminal",
       "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Agent resource manager: debug all tests",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/agent-team/apps/agent-resource-manager",
+      "runtimeExecutable": "/opt/homebrew/bin/node",
+      "runtimeArgs": ["--import", "tsx", "--test", "--test-concurrency=1"],
+      "args": ["test/**/*.test.ts"],
+      "autoAttachChildProcesses": true,
+      "sourceMaps": true,
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
     }
   ]
 }

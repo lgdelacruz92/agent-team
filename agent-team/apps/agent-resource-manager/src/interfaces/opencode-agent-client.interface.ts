@@ -1,10 +1,10 @@
-// Defines the operations for one containerized OpenCode agent server.
+// Defines a client for one containerized OpenCode agent server.
 
 // An unknown state is not evidence that an agent or session has finished.
 export type OpencodeState = "idle" | "busy" | "unreachable" | "unknown"
 
 // Starts work on an agent and observes or stops its sessions.
-export interface OpencodeAgentInterface {
+export interface OpencodeAgentClientInterface {
   // URL of the OpenCode server for this agent.
   readonly url: string
 
