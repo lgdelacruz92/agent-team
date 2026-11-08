@@ -46,6 +46,7 @@ services:
     restart: unless-stopped
     env_file: .env.local
     entrypoint: ["/bin/sh", "/factory/start-app.sh"]
+    command: ["node", "dist/index.js"]
     environment:
       HOST: 0.0.0.0
       PORT: 3300
@@ -72,6 +73,7 @@ services:
     restart: unless-stopped
     env_file: .env.local
     entrypoint: ["/bin/sh", "/factory/start-app.sh"]
+    command: ["node", "dist/index.js"]
     environment:
       RESOURCE_MANAGER_DB_PATH: /shared-db/db.sqlite
     volumes:
