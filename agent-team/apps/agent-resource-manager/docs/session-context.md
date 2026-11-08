@@ -1,6 +1,6 @@
 # Agent resource manager session context
 
-Estimated reading time: 47 minutes (150 WPM)
+Estimated reading time: 48 minutes (150 WPM)
 
 ## Working agreement
 
@@ -21,7 +21,7 @@ Estimated reading time: 47 minutes (150 WPM)
 - The app has a runnable idle process loop, but no Resource Manager implementation or integrations. No agent startup or infrastructure changes have been requested.
 - Read the [shared data reference](../../scheduler/docs/shared-data.md) and this app's [data design](data.md) for agreed boundaries and the current scheduler behavior. Check the scheduler source before designing an integration.
 - The scheduler records assignments in shared SQLite. An incomplete assignment reserves its ticket and agent; it does not prove work has started.
-- The intended manager will reconcile real agent state, report progress, and move Vikunja cards. Lifecycle, recovery, and completion coordination remain undecided.
+- The intended manager will reconcile real agent state, report progress, and move Vikunja cards. Lifecycle, recovery, and completion coordination have agreed directions; implementation details remain.
 
 ## Session context
 
@@ -169,3 +169,5 @@ Estimated reading time: 47 minutes (150 WPM)
 - User asked whether the agent-table decisions were noted in `scheduler/docs/open-discussion.md`. That file does not mention the URL or agent table; the URL decision is recorded in this session context. `scheduler/docs/retry-limit-handoff.md` records the unreachable-agent responsibility, and `scheduler/docs/agent-resource-manager.md` describes the current schema. The scheduler discussion document is stale about counting and coordination because decisions have since been made; it was not changed.
 - User requested updating `scheduler/docs/open-discussion.md` and creating `scheduler/docs/missing-features.md` for the remaining work needed for the Ticket Scheduler and Resource Manager to work together. Recorded the agreed data, counting, agent, lock, and completion directions and the unimplemented cross-app checklist. No implementation was requested.
 - User requested `dont-forget.md` in both apps' docs for high-priority work left for later. The Resource Manager list captures the paused `runOnce()` work, remaining shared-data and coordination design, and integration checklist; the user explicitly identified the Ticket Scheduler's retry-limit handoff and missing features as priorities. No implementation was requested.
+- User resumed the Resource Manager project. Reviewed its documents and interfaces, plus the Ticket Scheduler's current handoff, shared-data documentation, and lock and retry implementation. The manager still runs only an idle loop; `runOnce()` remains paused pending the data and coordination discussion and user direction. The scheduler now implements its side of the shared lock and configurable attempt limit; its old handoffs and `dont-forget.md` were removed after that work. At the time, the Resource Manager's older proposal and diagrams contained stale details about decisions and scheduler implementation; the diagrams were updated afterward. No implementation, services, or infrastructure changes were requested.
+- User requested updating all Resource Manager diagrams. Updated the flowchart and sequence diagrams to distinguish implemented Ticket Scheduler behavior from the planned Resource Manager, show the agreed attempt counting and shared-lock completion flow, and identify deferred details. Updated the data diagram to match the scheduler's manual shared-table seed and corrected its outdated limit and lock notes. Parsed all five Mermaid diagrams successfully. No app implementation or infrastructure changes were made.

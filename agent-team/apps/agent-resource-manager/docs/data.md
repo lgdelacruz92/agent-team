@@ -2,35 +2,35 @@
 
 Estimated reading time: 8 minutes (150 WPM)
 
-This is a working design, not an implemented schema. It follows the [sequence diagram](sequence-diagram.md).
+This is the working shared-data design. The Ticket Scheduler includes a manual seed for the execution and lock tables, but the Resource Manager integration is not implemented. See the [sequence diagram](sequence-diagram.md).
 
 ## Executions
 
-An execution record tracks startup and work for an assignment. The `executions` table would keep the OpenCode session and attempt history for monitoring and debugging. A record does not necessarily count as an attempt; see the counting rules below. The user approved the execution and lock fields shown below.
+An execution record tracks startup and work for an assignment. The `executions` table keeps OpenCode session and attempt history for monitoring and debugging. A record does not necessarily count as an attempt; see the counting rules below. The user approved the execution and lock fields shown below.
 
 ```mermaid
 erDiagram
     EXECUTIONS {
-        bigint id PK "Identifies the execution"
-        bigint assignment_id FK "Links to the assignment"
-        string session_id "OpenCode session ID when known"
-        string status "Attempt state"
-        timestamp created_at "When the record was created"
-        timestamp work_requested_at "When the work request was recorded"
-        timestamp started_at "When work started if known"
-        timestamp finished_at "When the outcome was decided"
-        string failure_reason "Why the attempt failed if applicable"
+        INTEGER id PK "Identifies the execution"
+        INTEGER assignment_id FK "Links to the assignment"
+        TEXT session_id "OpenCode session ID when known"
+        TEXT status "Attempt state"
+        TEXT created_at "When the record was created"
+        TEXT work_requested_at "When the work request was recorded"
+        TEXT started_at "When work started if known"
+        TEXT finished_at "When the outcome was decided"
+        TEXT failure_reason "Why the attempt failed if applicable"
     }
     LOCKS {
-        string name PK "Identifies the shared lock"
-        string owner "Identifies the current holder"
-        timestamp acquired_at "When the lock was acquired"
+        TEXT name PK "Identifies the shared lock"
+        TEXT owner "Identifies the current holder"
+        TEXT acquired_at "When the lock was acquired"
     }
 ```
 
-Types are illustrative, not an approved SQLite schema. The execution's session ID, work request time, start and finish times, and failure reason may be empty.
+Types match the Ticket Scheduler's manual SQLite seed, not proof that any particular database has been prepared. The execution's session ID, work request time, start and finish times, and failure reason may be empty. See [setup](setup.md) for prerequisites and seed limitations.
 
-The proposed `locks` table coordinates the Resource Manager and Ticket Scheduler. Each app would claim and release a lock row using short transactions; neither would hold a SQLite transaction open during Vikunja calls. Potentially stale locks are flagged for a human rather than cleared automatically. The detailed implementation and recovery procedure still need work.
+The `locks` table coordinates the Resource Manager and Ticket Scheduler. The scheduler claims and releases the row using short database operations; the manager must follow the same protocol. Neither should hold a SQLite transaction open during Vikunja calls. Potentially stale locks are left for human review rather than cleared automatically; the warning threshold and recovery procedure are deferred.
 
 ### Execution statuses
 
@@ -75,7 +75,7 @@ The assignment already links to a ticket and an agent, so their IDs need not be 
 
 The Resource Manager holds the shared lock while moving a ticket to `Done` or `Retry` and marking the assignment complete in SQLite. The Ticket Scheduler holds the same lock across its board fetch, ticket sync, and scheduling pass. This prevents an overlapping scheduler pass from using an older board fetch as the assignment is released.
 
-Both apps must use the protocol, and Vikunja reads must reflect confirmed moves. The detailed lock and failure-recovery protocol is not implemented yet; keep the assignment reserved when safe completion cannot be established.
+Both apps must use the protocol, and Vikunja reads must reflect confirmed moves. The scheduler side is implemented; the Resource Manager side is not. Keep the assignment reserved when safe completion cannot be established.
 
 If the shared lock is already held, the app skips the coordinated work and retries on its next tick. The Resource Manager keeps the assignment reserved while it waits; unrelated work need not stop.
 
@@ -92,4 +92,4 @@ If the card move succeeds but marking the assignment complete fails, leave the c
 
 **Deferred:** Logging implementation, retention, and monitoring details.
 
-The first attempt counts as 1 toward the limit, but the limit is not yet decided. An assignment remains reserved while its `completed_at` is empty; finishing an execution does not by itself release it.
+The first recorded attempt counts as 1. The Ticket Scheduler's limit defaults to 3 and is configurable. An assignment remains reserved while its `completed_at` is empty; finishing an execution does not by itself release it.

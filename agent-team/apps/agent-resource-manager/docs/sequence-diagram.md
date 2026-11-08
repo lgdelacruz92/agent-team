@@ -2,7 +2,7 @@
 
 Estimated reading time: 3 minutes (150 WPM)
 
-**Draft:** This is a proposed flow, not implemented behavior or an approved lifecycle. It will change as we resolve the open questions.
+The Ticket Scheduler flow is implemented. Resource Manager actions are the agreed direction, not implemented behavior; the current manager loop is idle. This diagram omits some restart cases; see the [data design](data.md) for those decisions.
 
 ## One assignment
 
@@ -20,44 +20,60 @@ sequenceDiagram
         participant H as Human monitor
     end
 
-    loop Every Resource Manager tick for each agent
+    loop Each planned Resource Manager tick for every agent
         RM->>A: Check agent status
         A-->>RM: Observed status or unreachable
-        Note over RM: Idle and ready means success for the attempt<br/>Too slow or unreachable means failure
         opt Agent is unreachable
             RM->>DB: Mark agent unavailable and flag for human review
         end
     end
 
-    S->>V: Fetch board tickets
-    V-->>S: Tickets and column statuses
-    S->>DB: Sync tickets and reserve an eligible assignment
-    Note over S,DB: Attempt-limit check applies to Retry tickets
-    Note over DB: Incomplete assignment reserves ticket and agent
+    S->>DB: Try to acquire ticket-scheduling lock
+    alt Lock already held
+        Note over S: Skip this pass and retry later
+    else Lock acquired
+        S->>V: Fetch board tickets
+        V-->>S: Tickets and column statuses
+        S->>DB: Sync tickets and find eligible work
+        opt Eligible ticket is in Retry
+            S->>DB: Count recorded work requests for ticket
+            DB-->>S: Attempt count
+        end
+        alt Retry at attempt limit
+            S->>V: Move card to Flagged tickets
+            Note over S,H: Human intervention<br/>No assignment is created
+        else Eligible work and idle agent available
+            S->>DB: Reserve ticket and agent with an assignment
+        end
+        S->>DB: Release lock using owner token
+    end
 
+    Note over DB: Incomplete assignment reserves ticket and agent<br/>It does not prove work started
+    Note over RM: The following is planned, not implemented
     RM->>DB: Read incomplete assignment, ticket, and agent
-    Note over RM,DB: Agent URL and execution history<br/>are not in the current schema
-    RM->>A: Check for existing work / actual state
-    alt Safe to start
+    alt New work with no existing execution
         RM->>V: Fetch task by vikunja_task_id
-        break Task fetch fails
+        alt Task fetch fails
             V-->>RM: Fetch failure
             Note over RM,DB: Keep reservation and retry later<br/>Do not count an agent attempt
             opt Failure persists
                 RM->>H: Alert about the fetch failure
             end
+        else Task fetch succeeds
+            V-->>RM: Task details, including description
+            RM->>DB: Create starting execution
+            RM->>A: Create session
+            A-->>RM: Session ID
+            RM->>DB: Save session ID
+            Note over RM: Log execution and session IDs before sending<br/>Logging details are deferred
+            RM->>A: Send work request
+            RM->>DB: Record work_requested_at after sending
+            Note over RM,DB: A recorded request counts as one attempt<br/>A sent but unrecorded request does not
         end
-        V-->>RM: Task details, including description
-        RM->>A: Request work with the ticket description
-        A-->>RM: Startup result
-    else Already running or finished
-        A-->>RM: Observed work or outcome
-    else State or startup is uncertain
-        opt Resource Manager decides the attempt failed
-            RM->>A: Try to stop the session
-            Note over RM,A: Retry can proceed even if stop is unconfirmed<br/>An old session may still be running
-            RM->>DB: Record failed attempt
-        end
+    else Existing execution or restart
+        RM->>A: Inspect known session and reconcile request state
+        A-->>RM: Observed state, missing, or unreachable
+        Note over RM,DB: Recovery depends on saved session ID and work_requested_at<br/>See data design for agreed cases
     end
 
     opt Startup confirmed
@@ -70,30 +86,38 @@ sequenceDiagram
         end
     end
 
-    opt Work is observed running
-        RM->>A: Check work state and outcome
-        A-->>RM: Observed state or outcome
-    end
-
-    opt Work finishes or the Resource Manager decides it failed
-        RM->>DB: Record the Resource Manager's outcome
+    opt An execution reaches an outcome
         alt Agent stopped processing and is ready
-            RM->>V: Move card to Done
-        else Agent is too slow or unreachable
-            RM->>V: Move card to Retry
+            RM->>DB: Record succeeded
+            Note over RM: Target column is Done<br/>Ticket results are not verified
+        else Too slow, unreachable, or confirmed missing session after recorded request
+            RM->>DB: Record failed
+            RM->>A: Try to stop the session when applicable
+            Note over RM,A: Target column is Retry<br/>Retry may proceed even if stop is unconfirmed
         end
-        Note over S,RM: Shared lock scope agreed<br/>completion and retry-limit protocol details remain
-        alt Safe completion protocol satisfied
-            RM->>DB: Complete assignment and report actual agent availability
-        else Safety cannot be established
-            RM->>H: Surface the issue for investigation
-            Note over DB: Keep the assignment reserved
+        RM->>DB: Try to acquire ticket-scheduling lock
+        alt Lock already held
+            Note over RM,DB: Keep reservation and retry later
+        else Lock acquired
+            RM->>V: Move card to Done or Retry
+            alt Move failed or result uncertain
+                Note over RM,DB: Keep reservation and retry move later
+            else Move confirmed
+                RM->>DB: Complete assignment
+                alt Completion failed or result uncertain
+                    Note over RM,DB: Leave card in place<br/>Inspect uncertain result and retry completion under lock
+                else Completion confirmed
+                    Note over DB: Reservation ends
+                end
+            end
+            RM->>DB: Release lock using owner token
         end
     end
 
     opt Later Ticket Scheduler pass finds an eligible Retry ticket
+        Note over S,DB: The scheduler holds ticket-scheduling lock<br/>across this fetch and scheduling pass
         S->>DB: Check recorded attempt count
-        Note over S,DB: First attempt counts as 1<br/>execution schema and counting rules undecided
+        Note over S,DB: First recorded attempt counts as 1<br/>Default limit is 3 and is configurable
         alt Below attempt limit
             S->>DB: Reserve a new assignment on an available agent
         else Attempt limit reached
@@ -103,7 +127,7 @@ sequenceDiagram
     end
 ```
 
-Dark blue groups are outside the Resource Manager app. The diagram shows logical interactions, not a promise that every action occurs in one pass. Retries, restarts, and failures may span multiple passes.
+Dark blue groups are outside the Resource Manager app. Interactions are logical, not a promise that every action occurs in one pass. Retries, restarts, and failures may span multiple passes. The shared tables and agent URL must be set up externally; their presence is not guaranteed.
 
 ## Discussed: directions to implement
 
@@ -116,10 +140,10 @@ Dark blue groups are outside the Resource Manager app. The diagram shows logical
 
 ## Values and details to work out
 
-- Agent timeout, attempt limit, and when persistent task-fetch failures trigger an alert.
+- Agent timeout and when persistent task-fetch failures trigger an alert. The Ticket Scheduler's attempt limit defaults to 3 and is configurable.
 - Stale-lock warning threshold and human recovery steps, explicitly deferred for later.
-- Execution-record fields, session identification, startup and restart recovery, and readiness detection for the correct execution.
-- Lock protocol and coordination with other controllers, card-move failures, and how humans clear agent or ticket flags.
+- Session identification, startup and restart implementation, and readiness detection for the correct execution. Execution fields and several recovery cases are agreed in the [data design](data.md).
+- Lock implementation on the Resource Manager side, coordination with other controllers, and how humans clear agent or ticket flags. The lock scope and key failure handling are agreed in the [data design](data.md).
 
 These are discussed topics, not necessarily new questions for the user. Work through implementation details as we build, and revisit deferred decisions when needed.
 
