@@ -40,11 +40,11 @@ function readBuckets(value: unknown): KanbanBucket[] {
   return value.map((bucket) => {
     if (!isObject(bucket) || !isPositiveInteger(bucket.id) || typeof bucket.title !== "string"
       || typeof bucket.count !== "number" || !Number.isSafeInteger(bucket.count) || bucket.count < 0
-      || (bucket.tasks !== null && !Array.isArray(bucket.tasks))) {
+      || (bucket.tasks !== undefined && bucket.tasks !== null && !Array.isArray(bucket.tasks))) {
       throw new Error("Vikunja response contains an invalid Kanban bucket")
     }
 
-    const tasks = bucket.tasks === null ? null : (bucket.tasks as unknown[]).map((task) => {
+    const tasks = bucket.tasks === undefined || bucket.tasks === null ? null : (bucket.tasks as unknown[]).map((task) => {
       if (!isObject(task) || !isPositiveInteger(task.id) || typeof task.title !== "string"
         || typeof task.priority !== "number" || !Number.isSafeInteger(task.priority)) {
         throw new Error("Vikunja response contains an invalid task")
@@ -96,12 +96,11 @@ export class Vikunja implements VikunjaInterface {
     const tickets = new Map<number, VikunjaTicket>()
     const seenByBucket = new Map<number, Set<number>>()
     let page = 1
-
+    
     while (true) {
       const buckets = await this.getPage(page)
       let hasMore = false
       let newCards = 0
-
       for (const bucket of buckets) {
         const seen = seenByBucket.get(bucket.id) ?? new Set<number>()
         seenByBucket.set(bucket.id, seen)

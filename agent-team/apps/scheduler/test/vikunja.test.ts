@@ -56,6 +56,22 @@ test("getTickets handles empty boards and null or empty column tasks", async () 
   }
 })
 
+test("getTickets accepts omitted tasks in empty columns alongside populated columns", async () => {
+  const request: typeof fetch = async () => json([
+    bucket(1, "Ready", 10),
+    { id: 2, title: "Done", count: 0 },
+  ])
+
+  assert.deepEqual(await new Vikunja(options, request).getTickets(), [
+    { vikunjaTaskId: 10, title: "Ticket 10", status: "Ready", priority: 1 },
+  ])
+})
+
+test("getTickets rejects incomplete pagination when a nonempty column omits tasks", async () => {
+  const request: typeof fetch = async () => json([{ id: 1, title: "Ready", count: 1 }])
+  await assert.rejects(new Vikunja(options, request).getTickets(), /pagination stopped/)
+})
+
 test("getTickets paginates each column using its count even when the server caps page size", async () => {
   const pages: number[] = []
   const request: typeof fetch = async (url) => {
@@ -194,6 +210,20 @@ test("moveToFlagged finds the exact column and posts the scoped authenticated mo
     "GET https://vikunja.example/api/v1/projects/3/views/12/tasks?page=1&per_page=50",
     "POST https://vikunja.example/api/v1/projects/3/views/12/buckets/9/tasks",
   ])
+})
+
+test("moveToFlagged accepts an empty destination with omitted tasks", async () => {
+  let posted = false
+  const request: typeof fetch = async (_url, init) => {
+    if (init?.method === "POST") {
+      posted = true
+      return new Response(null, { status: 200 })
+    }
+    return json([{ id: 9, title: "Flagged tickets", count: 0 }])
+  }
+
+  await new Vikunja(options, request).moveToFlagged(42)
+  assert.equal(posted, true)
 })
 
 test("moveToFlagged rejects invalid task IDs without a request", async () => {

@@ -12,6 +12,6 @@ Estimated reading time: 2 minutes (150 WPM)
 
 ## Agent instructions
 
-- The user intends to write `coordination.md`; don't assume its contents or location. The shared manifest is currently empty.
+- The user intends to write `coordination.md`; don't assume its contents or location.
 - Preserve the `agents/manifests.md` symlink and make its target available in containers when changing manifest versions. Recreate existing agent containers when authorized if they don't yet have the Compose mount.
 - Keep the [session handoff](session-context.md) current after each user prompt; archive older history when needed.

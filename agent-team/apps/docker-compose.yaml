@@ -163,6 +163,13 @@ services:
       HOST: 0.0.0.0
       PORT: 3300
       SCHEDULER_DB_PATH: /shared-db/db.sqlite
+      VIKUNJA_PROJECT_ID: ${CTR_PROJECT_ID:-2}
+      VIKUNJA_VIEW_ID: ${CTR_VIEW_ID:-12}
+    #       baseUrl: process.env.VIKUNJA_URL ?? "",
+    # token: process.env.VIKUNJA_API_TOKEN ?? "",
+    # projectId: Number(process.env.VIKUNJA_PROJECT_ID ?? "0"),
+    # viewId: Number(process.env.VIKUNJA_VIEW_ID ?? "0"),
+
     volumes:
       - ./shared-db:/shared-db
     ports:
