@@ -87,11 +87,15 @@ test("dispatches, observes and completes while coordinating with the scheduler l
   } finally { db.close() }
 })
 
-test("task fetch failures preserve the reservation without creating an attempt", async () => {
+test("logs every task fetch failure and preserves the reservation without creating an attempt", async (t) => {
   const { db, vikunja, database, manager } = setup()
   try {
+    const errors = t.mock.method(console, "error", () => {})
     vikunja.fetchError = true
     await assert.rejects(manager.runOnce(), AggregateError)
+    await assert.rejects(manager.runOnce(), AggregateError)
+    assert.equal(errors.mock.callCount(), 2)
+    assert.match(String(errors.mock.calls[0].arguments[0]), /assignment 1/)
     assert.equal(await database.getLatestExecution(1), null)
     assert.equal((await database.getAssignment(1))?.completedAt, null)
     vikunja.fetchError = false

@@ -13,10 +13,13 @@ const database = openDatabase(config.databasePath)
 const sharedDatabase = new ResourceManagerDatabase(database)
 const createClient = (url: string) => new OpencodeAgentClient(url, config.opencodeHeaders)
 const agentChecks = new ResourceManager(sharedDatabase, createClient)
-const assignments = new AssignmentReconciler(sharedDatabase, new Vikunja(config.vikunja), new SharedLock(database), createClient, config.executionTimeoutMs)
+const schedulingLock = new SharedLock(database)
+const assignments = new AssignmentReconciler(sharedDatabase, new Vikunja(config.vikunja), schedulingLock, createClient, config.executionTimeoutMs)
 const managerLock = new SharedLock(database, "resource-manager-pass")
 const manager = {
   async runOnce(): Promise<void> {
+    // Check even when no assignments are ready: a stale lock can block the scheduler.
+    await schedulingLock.warnIfStale()
     const owner = await managerLock.tryAcquire()
     if (!owner) {
       console.warn("Resource Manager pass skipped: resource-manager-pass lock is held")

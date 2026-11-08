@@ -32,7 +32,7 @@ flowchart TD
     Check -->|"yes"| Recover["Reconcile saved session and request state"]
     Check -->|"no"| Fetch["Fetch full Vikunja task"]
     Fetch --> FetchOK{"Fetch succeeded?"}
-    FetchOK -->|"no"| FetchRetry["Keep reservation and retry;<br/>alert human if failure persists"]
+    FetchOK -->|"no"| FetchRetry["Keep reservation and retry;<br/>log each failure to the terminal"]
     FetchOK -->|"yes"| Create["Create starting execution;<br/>create session and save session ID"]
     Create --> Send["Log intent, send work, then record work_requested_at"]
     Send --> Observe["Observe session and agent"]

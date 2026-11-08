@@ -30,7 +30,7 @@ These are boundaries, not a requirement to build all of them at once. How code a
 4. **Observe:** the Resource Manager marks an attempt successful when its agent is no longer processing and is ready for the next task. It does not verify ticket criteria or results. An agent that takes too long or is unreachable is marked failed. A failed card move is retried or surfaced; it does not by itself mean the agent stopped.
 5. **Finish:** coordinate the final card state, local ticket state, assignment completion, and agent availability. Report actual availability where known. When an attempt is judged failed, try to stop its session but do not require confirmed shutdown before allowing retry; an old session may continue running.
 
-If fetching the task description before a new start fails, keep the assignment reserved, retry the fetch, and alert a human if the failure persists. Do not count the fetch failure as an agent attempt; no new work was started.
+If fetching the task description before a new start fails, keep the assignment reserved, retry the fetch, and log every failure to the terminal. Do not count the fetch failure as an agent attempt; no new work was started.
 
 If an agent is unreachable, mark it unavailable and flag it for human review. When a failed attempt can be retried under the Ticket Scheduler's limit, use another available agent. How flags are represented and cleared remains to be determined.
 

@@ -1,6 +1,6 @@
 # Agent resource manager session context
 
-Estimated reading time: 6 minutes (150 WPM)
+Estimated reading time: 7 minutes (150 WPM)
 
 ## Working agreement
 
@@ -20,7 +20,7 @@ Estimated reading time: 6 minutes (150 WPM)
 
 ## Agreed directions
 
-- Fetch the full Vikunja task description before starting. If fetching fails, keep the assignment reserved, retry, and alert a human if failure persists; it is not an agent attempt.
+- Fetch the full Vikunja task description before starting. If fetching fails, keep the assignment reserved, retry, and log each failure to the terminal; it is not an agent attempt. No separate alert is needed for this prototype.
 - Create an execution after fetching the task and before creating the session; save the session ID before sending work. Count an attempt only when `work_requested_at` is recorded after sending. A sent but unrecorded request does not count; the user accepts possible duplicate work. See [data design](data.md) for approved restart cases.
 - The manager decides outcomes: an agent idle and ready means success without verifying task results; too slow or unreachable means failure. Try to stop a failed session, but retries may proceed without confirmation. Flag unreachable agents for human review and use another available agent.
 - Move successful work to `Done` and failed work to `Retry`. The Ticket Scheduler moves exhausted retries to `Flagged tickets`. Assume humans do not manually move cards; broad inconsistency reporting is not established.
@@ -29,10 +29,14 @@ Estimated reading time: 6 minutes (150 WPM)
 ## Remaining work and deferred details
 
 - The user asked to skip deployed API verification and knows how to connect Vikunja; actual API compatibility and cross-controller coordination remain unverified. Fast work can now be recognized by a newer completed busy/idle interval compared with its pre-prompt baseline. If timestamps are absent or do not advance, the assignment can still wait until restart or timeout. The agreed restart rule accepts an idle, ready session with recorded work as success.
-- The execution timeout is configurable but disabled by default. Persistent-fetch alert timing and delivery, stale-lock warning threshold and human recovery steps, and logging retention and monitoring remain deferred. Fetch failures are logged each pass; a separate alert is not implemented.
+- The execution timeout is configurable but disabled by default. The manager logs locks held for more than two minutes and waits for a human; it never automatically removes them. Human recovery steps, logging retention, and monitoring remain deferred.
 
 ## Recent context
 
+- User asked what remains before a first test run. Key prerequisites: isolated test board and agent workspace, both apps on the same prepared database and board, exported environment settings, no competing controller, and monitoring; deployed API behavior remains unverified. No live run was started.
+- User set a two-minute stale-lock threshold and chose terminal warnings with human recovery, not automatic removal. The manager checks both lock names and warns about invalid timestamps; recovery steps remain to be documented. All 50 manager tests, the build, and application/test typechecks passed.
+- User chose terminal logging for every failed task fetch; no separate alert is needed for the prototype. Existing reconciliation already logs each failed fetch and keeps the reservation. Next discuss stale-lock recovery.
+- User asked what is next after fast-task detection. Continue with the remaining alerting and stale-lock recovery item, discussing decisions one at a time.
 - User approved using session busy/idle timestamps to recognize work completed between polls. Implemented an in-memory pre-prompt baseline and validated newer completed intervals, including reused sessions and timeout cases. All 47 manager tests, the build, and application/test typechecks passed. Controlled tests do not establish deployed API compatibility.
 - User has a Vikunja server and knows how to hook it up; they asked to skip deployed API verification. This is not evidence the manager's deployed API assumptions were tested.
 - User wants to go through deployed API verification, fast-task readiness, and alerting/stale-lock recovery one item at a time, starting with deployed API verification.

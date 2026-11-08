@@ -2,7 +2,7 @@
 
 Estimated reading time: 3 minutes (150 WPM)
 
-The core flow is implemented and tested with controlled dependencies. Deployed API compatibility, alert delivery, and some readiness behavior still need verification or decisions. This diagram omits some restart cases; see the [data design](data.md).
+The core flow is implemented and tested with controlled dependencies. Deployed API compatibility and some readiness behavior still need verification or decisions. This diagram omits some restart cases; see the [data design](data.md).
 
 ## One assignment
 
@@ -56,9 +56,7 @@ sequenceDiagram
         alt Task fetch fails
             V-->>RM: Fetch failure
             Note over RM,DB: Keep reservation and retry later<br/>Do not count an agent attempt
-            opt Failure persists
-                RM->>H: Alert about the fetch failure
-            end
+            RM->>H: Log each fetch failure to the terminal
         else Task fetch succeeds
             V-->>RM: Task details, including description
             RM->>DB: Create starting execution
@@ -131,7 +129,7 @@ Dark blue groups are outside the Resource Manager app. Interactions are logical,
 
 ## Discussed: directions to implement
 
-- Fetch the full Vikunja description before starting work. If the fetch fails, keep the assignment reserved, retry, and alert a human if the failure persists.
+- Fetch the full Vikunja description before starting work. If the fetch fails, keep the assignment reserved, retry, and log each failure to the terminal.
 - Poll every agent each tick. The Resource Manager decides the outcome: idle and ready means success; too slow or unreachable means failure.
 - On failure, try to stop the session, but allow a retry even if the stop cannot be confirmed. Flag unreachable agents for human review and use another available agent.
 - The Ticket Scheduler checks the attempt limit and moves exhausted tickets to `Flagged tickets`. The first attempt counts as 1.
@@ -140,8 +138,8 @@ Dark blue groups are outside the Resource Manager app. Interactions are logical,
 
 ## Values and details to work out
 
-- Agent timeout value and when persistent task-fetch failures trigger an alert. The timeout is configurable but disabled by default; failures are logged each pass. The Ticket Scheduler's attempt limit defaults to 3 and is configurable.
-- Stale-lock warning threshold and human recovery steps, explicitly deferred for later.
+- Agent timeout value. The timeout is configurable but disabled by default. The Ticket Scheduler's attempt limit defaults to 3 and is configurable.
+- Locks held for more than two minutes are logged for human review, not removed automatically. Human recovery steps remain to be documented.
 - Verify session identification and readiness against the deployed OpenCode API. Fast tasks can be recognized from a newer completed busy/idle interval; if timestamps are absent or do not advance, the assignment can remain reserved until restart or configured timeout.
 - Coordination with other controllers and how humans clear agent or ticket flags. The shared lock and key failure handling are implemented; the manager also uses a pass lock that requires human review if left behind by a crash.
 

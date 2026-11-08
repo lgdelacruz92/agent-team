@@ -30,7 +30,7 @@ erDiagram
 
 Types match the Ticket Scheduler's manual SQLite seed, not proof that any particular database has been prepared. The execution's session ID, work request time, start and finish times, and failure reason may be empty. See [setup](setup.md) for prerequisites and seed limitations.
 
-The `locks` table coordinates the Resource Manager and Ticket Scheduler. The scheduler claims and releases the row using short database operations; the manager must follow the same protocol. Neither should hold a SQLite transaction open during Vikunja calls. Potentially stale locks are left for human review rather than cleared automatically; the warning threshold and recovery procedure are deferred.
+The `locks` table coordinates the Resource Manager and Ticket Scheduler. Both claim and release the row using short database operations. Neither holds a SQLite transaction open during Vikunja calls. The manager warns when a lock is held for more than two minutes, but leaves it for human review. Recovery steps remain deferred.
 
 ### Execution statuses
 
