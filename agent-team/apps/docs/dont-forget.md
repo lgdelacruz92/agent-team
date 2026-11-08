@@ -6,8 +6,8 @@ Estimated reading time: 3 minutes (150 WPM)
 
 - We left off testing the Ticket Scheduler and Agent Resource Manager together. A successful joint test run has not yet been confirmed.
 - Remember to implement regular session cleanup for agents. The cleanup mechanism and schedule have not been specified.
-- `frontend-factory/` now packages the frontend agent, scheduler, and manager. Its database and environment link to the parent files; its factory containers have not yet been started together.
-- The user plans a similar backend factory. Use a separate database and the appropriate backend agent and board configuration; don't share ticket state between different boards.
+- `frontend-factory/` packages the frontend agent, scheduler, and manager. Its database is a local copy, separate from the parent; its environment links to the parent file. Its factory containers have not yet been started together.
+- `backend-factory/` packages the backend agent, scheduler, and manager for project `3`, view `16`, with its own database. Its images were built, but the factory has not been started. Its backend shares host port `4097` with the original backend. Verify the board, backend agent, database state, and workspace before starting.
 
 ## Before continuing the joint test
 

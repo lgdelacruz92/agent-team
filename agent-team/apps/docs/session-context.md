@@ -1,6 +1,6 @@
 # Apps project session context
 
-Estimated reading time: 8 minutes (150 WPM)
+Estimated reading time: 11 minutes (150 WPM)
 
 ## Working agreement
 
@@ -10,7 +10,7 @@ Estimated reading time: 8 minutes (150 WPM)
 
 ## Current focus
 
-The user reports that the Ticket Scheduler worked with the frontend project ID. They want a `frontend-factory` that runs the frontend agent, scheduler, and Agent Resource Manager together from its own Compose folder and `.env.local`. A similar backend factory is planned later. These notes belong at the `apps/` level because the work spans both projects and their parent setup.
+The user requested a `backend-factory` like `frontend-factory`, using Vikunja project ID `3`, view ID `16`, and the backend agent instead of the frontend agent. Both factories package an agent, scheduler, and Agent Resource Manager together. The user reports that the Ticket Scheduler worked with the frontend project ID. These notes belong at the `apps/` level because the work spans both projects and their parent setup.
 
 The scheduler reserves tickets and agents in a shared SQLite database. The resource manager checks agents, dispatches assignments, and reconciles execution and card movement. Starting the manager can dispatch real work, change agent status, and move Vikunja cards. Do not start it merely to resume the project.
 
@@ -18,12 +18,14 @@ The resource manager's [session context](../agent-resource-manager/docs/session-
 
 ## Current state
 
-- `frontend-factory/docker-compose.yaml` defines the three services. Its `.env.local` links to the apps-level file, and `db.sqlite` links to `../shared-db/db.sqlite`. The scheduler and manager mount the parent database directory so they also share SQLite's WAL files.
-- All three factory images built and Compose configuration validated. One-off checks verified both app containers can read the shared database and board settings, and the frontend container can read its instructions and workspace. The factory itself has not been started; a joint test run has not been confirmed.
+- `backend-factory/docker-compose.yaml` defines the backend agent, scheduler, and manager. Its `.env.local` links to the apps-level file; Compose explicitly sets project `3` and view `16` for both controller apps. Its `db.sqlite` links to `db/db.sqlite`, separate from the frontend database. Both apps mount the backend database directory, including WAL files. Its agent row is `backend`, `idle`, `http://backend:4096`.
+- All three backend factory images built. Compose, separate database links, database integrity, and the backend agent row were validated; the frontend database was not modified. The factory was not started and a joint live test has not been confirmed. The backend and scheduler use host ports `4097` and `3301`; the original backend also uses `4097`. Check the agent, board, database, and workspace before starting.
+- `frontend-factory/docker-compose.yaml` defines the three services. Its `.env.local` links to the apps-level file; `db.sqlite` is a regular, point-in-time copy of `../shared-db/db.sqlite`, separate from both the parent and backend databases. The scheduler and manager mount the factory directory so they also share SQLite's WAL files. The copy passed a quick integrity check and initially had one agent, no incomplete assignments, and no locks.
+- All three frontend factory images built and Compose configuration validated. Earlier one-off checks verified both app containers could read the then-shared database and board settings, and the frontend container could read its instructions and workspace; the new local database mount has not been checked in a container. The factory itself has not been started; a joint test run has not been confirmed.
 - `docker-compose.yaml` includes `scheduler` and `agent-resource-manager`. Both use `${ENV_FILE:-.env.local}` and mount `shared-db/` at `/shared-db`; Compose sets both database paths to `/shared-db/db.sqlite`. The scheduler exposes port 3300 on localhost.
 - The original scheduler, resource manager, and frontend containers were stopped when the factory was created. Don't run the original and factory schedulers against the same board simultaneously.
 - The apps-level `.env.local` contains `CTR_PROJECT_ID` and `CTR_VIEW_ID`. The factory's startup script maps them to the apps' `VIKUNJA_*` IDs unless those IDs are explicitly set.
-- The shared database passed SQLite's quick integrity check and contains a frontend agent. A complete schema and real agent validation have not been performed. Both apps require an already prepared, shared database; neither creates or migrates the schema on startup.
+- The original shared database passed SQLite's quick integrity check and contains a frontend agent. A complete schema and real agent validation have not been performed. Each factory's apps require the same prepared database within that factory; neither app creates or migrates the schema on startup.
 - Controlled tests exist, but compatibility with deployed OpenCode and Vikunja APIs and cross-controller coordination remain unverified. The user previously chose to skip deployed API verification; that is not evidence it passed.
 
 ## Decisions and deferred work
@@ -32,11 +34,18 @@ The resource manager's [session context](../agent-resource-manager/docs/session-
 - **Decided:** Each agent reads the stable `agents/manifests.md` link. Compose mounts the `agents/` directory into each agent container, preserving the symlink. The current target, `agents/manifests/manifest.0.0.0.md`, instructs agents to work tickets in `/workspace/local-markets-app`.
 - **Deferred:** The user plans to create a separate `coordination.md` describing agent collaboration. Its contents and location have not been specified.
 - **Deferred:** Implement regular session cleanup for agents. The mechanism and schedule have not been specified.
-- **Deferred:** Create a similar backend factory. Different boards require separate databases as well as the appropriate agent and board configuration; changing only the project ID is not enough if they share a database.
+- **Decided:** The backend factory uses Vikunja project ID `3`, view ID `16`, and the backend agent. The user chose separate databases after discussing the risk of sharing ticket and agent state across different boards. Both use the same database schema.
 - See [don't forget](dont-forget.md) for first-run reminders.
 
 ## Recent context
 
+- User requested a local frontend database copy rather than a symlink. Made a consistent SQLite backup of the parent database, replaced the link with the copy, and pointed both frontend apps at the factory directory. Verified the separate file, integrity, and Compose mounts; no services were started. The copy does not sync with the parent.
+- User chose to switch back to a separate backend database. Restored the initial backend database from the temporary backup, linked `backend-factory/db.sqlite` to `db/db.sqlite`, and pointed both backend apps at that directory. Checked integrity and the backend agent row; no services were started.
+- User corrected the database setup: both factory `db.sqlite` links must point to the same parent database. Changed both backend app mounts accordingly without changing the shared database. Preserved the initially created isolated database at `/private/var/folders/mg/xfkfpgpn7p3107x73d7g6fhc0000gp/T/opencode/backend-factory-db.IS1tQ01A/db.sqlite`; it is no longer used by the factory.
+- Created `backend-factory/` with the backend agent, shared environment link, and board IDs; built its images and checked configuration without starting services. Its initial isolated database was replaced by the shared link at the user's request.
+- User corrected the backend board settings: project ID `3` and view ID `16` supersede the earlier IDs.
+- User requested the backend agent for a factory otherwise like the frontend factory, and asked to read the Compose files. The apps-level backend uses `images/base`, port `4097`, and `agents/backend.md`; the frontend factory's scheduler uses host port `3300`, so simultaneous factories need distinct host ports. The frontend startup script can inherit frontend `CTR_*` board settings unless explicitly overridden.
+- User asked to read the apps folder and its handoff before working on the backend factory. Reviewed the current notes, frontend factory configuration, and backend agent definition; no services were started and no implementation was requested.
 - Replaced the factory's database and environment copies with links to their parent files at the user's request. Preserved backups of the former copies in the session temporary directory. Factory apps now mount the shared database directory and map existing `CTR_*` board IDs at startup.
 - Created `frontend-factory/` with a local Compose file, environment copy, and isolated copy of the current shared database at the user's request. Built the images and checked configuration and mounts without starting the factory.
 - User asked to record where testing left off and to remember regular agent-session cleanup.
