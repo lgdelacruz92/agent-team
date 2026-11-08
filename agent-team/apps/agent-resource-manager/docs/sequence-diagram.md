@@ -2,7 +2,7 @@
 
 Estimated reading time: 3 minutes (150 WPM)
 
-The Ticket Scheduler flow and the first Resource Manager agent-check loop are implemented. The remaining Resource Manager actions are the agreed direction, not implemented behavior. This diagram omits some restart cases; see the [data design](data.md) for those decisions.
+The core flow is implemented and tested with controlled dependencies. Deployed API compatibility, alert delivery, and some readiness behavior still need verification or decisions. This diagram omits some restart cases; see the [data design](data.md).
 
 ## One assignment
 
@@ -49,7 +49,7 @@ sequenceDiagram
     end
 
     Note over DB: Incomplete assignment reserves ticket and agent<br/>It does not prove work started
-    Note over RM: The following is planned, not implemented
+    Note over RM: Reconcile each reserved assignment
     RM->>DB: Read incomplete assignment, ticket, and agent
     alt New work with no existing execution
         RM->>V: Fetch task by vikunja_task_id
@@ -77,7 +77,7 @@ sequenceDiagram
     end
 
     opt Startup confirmed
-        Note over RM,V: Ordering and recovery for reporting<br/>and card movement are undecided
+        Note over RM,V: Observed busy confirms startup<br/>Failed moves are retried while busy
         RM->>DB: Report observed agent and assignment progress
         RM->>V: Move card to In progress
         alt Move fails
@@ -140,10 +140,10 @@ Dark blue groups are outside the Resource Manager app. Interactions are logical,
 
 ## Values and details to work out
 
-- Agent timeout and when persistent task-fetch failures trigger an alert. The Ticket Scheduler's attempt limit defaults to 3 and is configurable.
+- Agent timeout value and when persistent task-fetch failures trigger an alert. The timeout is configurable but disabled by default; failures are logged each pass. The Ticket Scheduler's attempt limit defaults to 3 and is configurable.
 - Stale-lock warning threshold and human recovery steps, explicitly deferred for later.
-- Session identification, startup and restart implementation, and readiness detection for the correct execution. Execution fields and several recovery cases are agreed in the [data design](data.md).
-- Lock implementation on the Resource Manager side, coordination with other controllers, and how humans clear agent or ticket flags. The lock scope and key failure handling are agreed in the [data design](data.md).
+- Verify session identification and readiness against the deployed OpenCode API. A task that finishes between polls without being observed busy can remain reserved until restart or configured timeout.
+- Coordination with other controllers and how humans clear agent or ticket flags. The shared lock and key failure handling are implemented; the manager also uses a pass lock that requires human review if left behind by a crash.
 
 These are discussed topics, not necessarily new questions for the user. Work through implementation details as we build, and revisit deferred decisions when needed.
 

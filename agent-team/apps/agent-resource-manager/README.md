@@ -1,8 +1,8 @@
 # Agent resource manager
 
-Estimated reading time: 2 minutes (150 WPM)
+Estimated reading time: 3 minutes (150 WPM)
 
-This app will watch Ticket Scheduler assignments and reconcile real agent resources. Its current loop checks registered agents and flags unreachable ones, but does not dispatch work or reconcile assignments.
+This app checks registered agents and reconciles Ticket Scheduler assignments: fetches tasks, starts and observes OpenCode sessions, records executions, and moves cards before releasing reservations. The flow is tested with controlled services, not yet verified against the deployed APIs.
 
 ## Run
 
@@ -13,19 +13,23 @@ npm install
 npm run dev
 ```
 
-Starting the app immediately contacts registered agents and can change their database status to `needs_review`. It checks again every 30 seconds by default; `RESOURCE_MANAGER_POLL_MS` changes the interval. Stop it with Ctrl+C. To run the compiled app, use `npm run build` followed by `npm start`. Run tests with `npm test`.
+**Starting the app can dispatch real work, change agent status, and move Vikunja cards.** It checks every 30 seconds by default; `RESOURCE_MANAGER_POLL_MS` changes the interval. Stop it with Ctrl+C. To run the compiled app, use `npm run build` followed by `npm start`. Run tests with `npm test`.
 
 The default database is `apps/shared-db/db.sqlite`, shared with the Ticket Scheduler. `RESOURCE_MANAGER_DB_PATH` overrides it; if either app is overridden, ensure both still point to the same file.
 
-Set `OPENCODE_SERVER_PASSWORD` and, if needed, `OPENCODE_SERVER_USERNAME` for Basic authentication; the username defaults to `opencode`. These credentials are used for every registered server. A human must prepare the shared database and its agent rows first; see [setup](docs/setup.md).
+Set `VIKUNJA_URL`, `VIKUNJA_API_TOKEN`, `VIKUNJA_PROJECT_ID`, and `VIKUNJA_VIEW_ID` to the same board as the scheduler. Set `OPENCODE_SERVER_PASSWORD` and, if needed, `OPENCODE_SERVER_USERNAME` for Basic authentication; the username defaults to `opencode`. These credentials are used for every registered server. A human must prepare the shared database and its agent rows first; see [setup](docs/setup.md).
 
-Only an `unreachable` result sets `needs_review`. An `unknown` result or missing URL is logged and leaves the existing status unchanged, so the Ticket Scheduler may still select an agent whose stored status is `idle`. A recovered agent is not automatically cleared from `needs_review`.
+`RESOURCE_MANAGER_EXECUTION_TIMEOUT_MS` optionally sets a positive execution timeout in milliseconds. No timeout is enabled by default; its value remains a human decision. Task-fetch failures are logged on each failed pass; a separate persistent-failure alert and its timing are not implemented.
+
+An unreachable agent or timed-out execution sets `needs_review`. An `unknown` result or missing URL leaves the existing status unchanged, so the Ticket Scheduler may still select an agent whose stored status is `idle`. A recovered agent is not automatically cleared from `needs_review`.
+
+The `resource-manager-pass` lock prevents simultaneous manager passes. A crash can leave this lock or `ticket-scheduling` behind; neither is automatically cleared. A person must investigate stale locks before recovery. A freshly sent prompt must be observed busy before this process treats it as successful; a fast task that finishes between polls can remain reserved until a restart or be marked failed at the configured timeout. On restart, the agreed recovery rule accepts a recorded request whose session is idle and ready as successful.
 
 For the shared database prerequisite, see [setup](docs/setup.md).
 
 **Start here:** read the [data design](docs/data.md) and [session context](docs/session-context.md) for the agreed directions and remaining work. The scheduler's [shared data reference](../scheduler/docs/shared-data.md) describes its side of the integration; check the scheduler source before implementing it.
 
-These notes are context for future work, not authorization to start agents, modify infrastructure, or implement the app without a request.
+These notes are not authorization to start agents or modify infrastructure.
 
 For session decisions and current progress, read [session context](docs/session-context.md).
 

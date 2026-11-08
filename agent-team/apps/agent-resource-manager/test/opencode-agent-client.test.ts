@@ -109,11 +109,34 @@ test("reports unreachable when the request times out", async (t) => {
   assert.equal(await new OpencodeAgentClient("http://opencode.test", {}, 10).state(), "unreachable")
 })
 
-test("other agent operations fail explicitly until implemented", async () => {
-  const agent = new OpencodeAgentClient("http://opencode.test")
+test("creates, prompts, observes and interrupts a session", async (t) => {
+  const requests: Array<{ url: string; init?: RequestInit }> = []
+  const responses = [Response.json({ data: { id: "ses_1" } }), Response.json({}),
+    Response.json({ data: { id: "ses_1", time: { busy: 10 } } }), Response.json({})]
+  t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+    requests.push({ url: String(input), init })
+    return responses.shift()!
+  })
+  const agent = new OpencodeAgentClient("http://opencode.test", { Authorization: "Basic example" })
+  assert.equal(await agent.createSession("title"), "ses_1")
+  await agent.prompt("ses_1", "work")
+  assert.equal(await agent.sessionState("ses_1"), "busy")
+  await agent.abort("ses_1")
+  assert.deepEqual(requests.map((request) => request.url), ["http://opencode.test/api/session", "http://opencode.test/api/session/ses_1/prompt", "http://opencode.test/api/session/ses_1", "http://opencode.test/api/session/ses_1/interrupt"])
+  assert.deepEqual(JSON.parse(String(requests[1].init?.body)), { text: "work" })
+  assert.equal(new Headers(requests[0].init?.headers).get("authorization"), "Basic example")
+})
 
-  await assert.rejects(agent.createSession("title"), /not implemented/)
-  await assert.rejects(agent.prompt("ses_test", "work"), /not implemented/)
-  await assert.rejects(agent.sessionState("ses_test"), /not implemented/)
-  await assert.rejects(agent.abort("ses_test"), /not implemented/)
+test("distinguishes a missing session from HTTP errors and network failures", async (t) => {
+  const replies = [new Response(null, { status: 404 }), new Response(null, { status: 500 }), Response.json({ data: { id: "wrong", time: {} } })]
+  t.mock.method(globalThis, "fetch", async () => {
+    const reply = replies.shift()
+    if (!reply) throw new Error("offline")
+    return reply
+  })
+  const agent = new OpencodeAgentClient("http://opencode.test")
+  assert.equal(await agent.sessionState("ses_1"), "missing")
+  assert.equal(await agent.sessionState("ses_1"), "unknown")
+  assert.equal(await agent.sessionState("ses_1"), "unknown")
+  assert.equal(await agent.sessionState("ses_1"), "unreachable")
 })

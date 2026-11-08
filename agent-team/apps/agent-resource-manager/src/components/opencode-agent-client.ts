@@ -1,5 +1,5 @@
-// Observes one OpenCode server; other agent operations are not implemented yet.
-import type { OpencodeAgentClientInterface, OpencodeState } from "../interfaces/opencode-agent-client.interface.js"
+// Starts and observes sessions on one OpenCode server.
+import type { OpencodeAgentClientInterface, OpencodeSessionState, OpencodeState } from "../interfaces/opencode-agent-client.interface.js"
 
 // The frontend controller uses the same request timeout for OpenCode calls.
 const defaultTimeoutMs = 30_000
@@ -91,19 +91,61 @@ export class OpencodeAgentClient implements OpencodeAgentClientInterface {
     }
   }
 
-  async createSession(_title: string): Promise<string> {
-    throw new Error("OpencodeAgentClient.createSession is not implemented")
+  private async call(path: string, body?: unknown): Promise<Response> {
+    const response = await fetch(`${this.url.replace(/\/+$/, "")}${path}`, {
+      method: body === undefined ? "GET" : "POST",
+      headers: { ...this.headers, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(this.timeoutMs),
+    })
+    return response
   }
 
-  async prompt(_sessionId: string, _text: string): Promise<void> {
-    throw new Error("OpencodeAgentClient.prompt is not implemented")
+  private async post(path: string, body: unknown): Promise<Response> {
+    const response = await this.call(path, body)
+    if (!response.ok) throw new Error(`OpenCode POST ${path} returned HTTP ${response.status}`)
+    return response
   }
 
-  async sessionState(_sessionId: string): Promise<OpencodeState> {
-    throw new Error("OpencodeAgentClient.sessionState is not implemented")
+  private sessionPath(sessionId: string): string {
+    if (!sessionId) throw new Error("OpenCode session ID is required")
+    return `/api/session/${encodeURIComponent(sessionId)}`
   }
 
-  async abort(_sessionId: string): Promise<void> {
-    throw new Error("OpencodeAgentClient.abort is not implemented")
+  async createSession(title: string): Promise<string> {
+    const body: unknown = await (await this.post("/api/session", { title })).json()
+    if (!isRecord(body) || !isRecord(body.data) || typeof body.data.id !== "string" || !body.data.id) {
+      throw new Error("OpenCode returned an invalid session ID")
+    }
+    return body.data.id
+  }
+
+  async prompt(sessionId: string, text: string): Promise<void> {
+    await this.post(`${this.sessionPath(sessionId)}/prompt`, { text })
+  }
+
+  async sessionState(sessionId: string): Promise<OpencodeSessionState> {
+    let response: Response
+    try {
+      response = await this.call(this.sessionPath(sessionId))
+    } catch {
+      return "unreachable"
+    }
+    if (response.status === 404) return "missing"
+    if (!response.ok) return "unknown"
+    try {
+      const body: unknown = await response.json()
+      if (!isRecord(body) || !isRecord(body.data) || body.data.id !== sessionId || !isRecord(body.data.time)) return "unknown"
+      const { busy, idle } = body.data.time
+      if ((busy !== undefined && (typeof busy !== "number" || !Number.isFinite(busy)))
+        || (idle !== undefined && (typeof idle !== "number" || !Number.isFinite(idle)))) return "unknown"
+      return typeof busy === "number" && (idle === undefined || (typeof idle === "number" && idle < busy)) ? "busy" : "idle"
+    } catch {
+      return "unknown"
+    }
+  }
+
+  async abort(sessionId: string): Promise<void> {
+    await this.post(`${this.sessionPath(sessionId)}/interrupt`, {})
   }
 }

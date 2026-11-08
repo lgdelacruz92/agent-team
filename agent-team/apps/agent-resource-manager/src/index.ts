@@ -1,13 +1,38 @@
-// Starts agent checks against the prepared shared database.
-import { AgentDatabase } from "./components/agent-database.js"
+// Runs agent checks and assignment reconciliation against the prepared shared database.
+import { AssignmentReconciler } from "./components/assignment-reconciler.js"
 import { OpencodeAgentClient } from "./components/opencode-agent-client.js"
 import { ResourceManager } from "./components/resource-manager.js"
+import { ResourceManagerDatabase } from "./components/resource-manager-database.js"
+import { SharedLock } from "./components/shared-lock.js"
+import { Vikunja } from "./components/vikunja.js"
 import { config } from "./config.js"
 import { openDatabase } from "./db/database.js"
 import { runProcessLoop } from "./process-loop.js"
 
 const database = openDatabase(config.databasePath)
-const manager = new ResourceManager(new AgentDatabase(database), (url) => new OpencodeAgentClient(url, config.opencodeHeaders))
+const sharedDatabase = new ResourceManagerDatabase(database)
+const createClient = (url: string) => new OpencodeAgentClient(url, config.opencodeHeaders)
+const agentChecks = new ResourceManager(sharedDatabase, createClient)
+const assignments = new AssignmentReconciler(sharedDatabase, new Vikunja(config.vikunja), new SharedLock(database), createClient, config.executionTimeoutMs)
+const managerLock = new SharedLock(database, "resource-manager-pass")
+const manager = {
+  async runOnce(): Promise<void> {
+    const owner = await managerLock.tryAcquire()
+    if (!owner) {
+      console.warn("Resource Manager pass skipped: resource-manager-pass lock is held")
+      return
+    }
+    try {
+      const errors: unknown[] = []
+      for (const pass of [agentChecks, assignments]) {
+        try { await pass.runOnce() } catch (error) { errors.push(error) }
+      }
+      if (errors.length) throw new AggregateError(errors, "Resource Manager pass failed")
+    } finally {
+      await managerLock.release(owner)
+    }
+  },
+}
 const controller = new AbortController()
 
 process.on("SIGINT", () => controller.abort())

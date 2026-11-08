@@ -28,6 +28,20 @@ export interface Agent {
   url: string | null
 }
 
+export type ExecutionStatus = "starting" | "running" | "succeeded" | "failed"
+
+export interface Execution {
+  id: number
+  assignmentId: number
+  sessionId: string | null
+  status: ExecutionStatus
+  createdAt: string
+  workRequestedAt: string | null
+  startedAt: string | null
+  finishedAt: string | null
+  failureReason: string | null
+}
+
 // Reads reservations and reports Resource Manager-owned assignment and agent state.
 export interface ResourceManagerDatabaseInterface {
   // Read all agents for the per-tick status check.
@@ -35,6 +49,8 @@ export interface ResourceManagerDatabaseInterface {
 
   // Read assignments that still reserve their ticket and agent.
   listIncompleteAssignments(): Promise<Assignment[]>
+
+  getAssignment(assignmentId: number): Promise<Assignment | null>
 
   // Find the local ticket associated with an assignment, or null if it is missing.
   getTicket(ticketId: number): Promise<Ticket | null>
@@ -48,4 +64,11 @@ export interface ResourceManagerDatabaseInterface {
 
   // Report agent availability or flag an agent for human review.
   updateAgentStatus(agentId: number, status: string): Promise<void>
+
+  getLatestExecution(assignmentId: number): Promise<Execution | null>
+  createExecution(assignmentId: number, createdAt: string): Promise<Execution>
+  saveSession(executionId: number, sessionId: string): Promise<void>
+  recordWorkRequest(executionId: number, requestedAt: string): Promise<void>
+  markRunning(executionId: number, startedAt: string): Promise<void>
+  finishExecution(executionId: number, status: "succeeded" | "failed", finishedAt: string, reason: string | null): Promise<void>
 }

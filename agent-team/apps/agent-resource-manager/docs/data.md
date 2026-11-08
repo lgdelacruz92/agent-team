@@ -2,7 +2,7 @@
 
 Estimated reading time: 8 minutes (150 WPM)
 
-This is the working shared-data design. The Ticket Scheduler includes a manual seed for the execution and lock tables, but the Resource Manager integration is not implemented. See the [sequence diagram](sequence-diagram.md).
+This is the working shared-data design. Both apps now implement their sides of the shared execution and lock integration; actual deployed API compatibility still needs controlled verification. See the [sequence diagram](sequence-diagram.md).
 
 ## Executions
 
@@ -69,7 +69,7 @@ The execution table is the source of truth for the count. If the manager sends w
 
 The agreed direction is to log the execution and session IDs immediately before sending work, so a human can compare retained logs with the execution table for possible unrecorded requests. A log entry shows intent to send, not proof that the request was sent. The user wants to set logging aside for now and trusts a human to debug problems; logging implementation, retention, and monitoring details are deferred.
 
-The assignment already links to a ticket and an agent, so their IDs need not be repeated in the execution record. The agent's URL and availability belong in the `agents` table, separate from execution history. The current `agents` table does not yet have a URL field.
+The assignment already links to a ticket and an agent, so their IDs need not be repeated in the execution record. The agent's URL and availability belong in the `agents` table, separate from execution history. The fresh shared seed includes the URL field; existing databases may require a schema update.
 
 The user decided a human is responsible for prepopulating the `agents` table and ensuring its entries are valid at startup. The Resource Manager will still observe agents during operation and flag unreachable agents for human review. How the human prepares and validates the rows remains to be worked out.
 
@@ -77,7 +77,7 @@ The user decided a human is responsible for prepopulating the `agents` table and
 
 The Resource Manager holds the shared lock while moving a ticket to `Done` or `Retry` and marking the assignment complete in SQLite. The Ticket Scheduler holds the same lock across its board fetch, ticket sync, and scheduling pass. This prevents an overlapping scheduler pass from using an older board fetch as the assignment is released.
 
-Both apps must use the protocol, and Vikunja reads must reflect confirmed moves. The scheduler side is implemented; the Resource Manager side is not. Keep the assignment reserved when safe completion cannot be established.
+Both apps use the protocol, and Vikunja reads must reflect confirmed moves. Keep the assignment reserved when safe completion cannot be established.
 
 If the shared lock is already held, the app skips the coordinated work and retries on its next tick. The Resource Manager keeps the assignment reserved while it waits; unrelated work need not stop.
 
