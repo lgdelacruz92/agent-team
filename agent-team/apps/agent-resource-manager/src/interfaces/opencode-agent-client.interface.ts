@@ -4,6 +4,13 @@
 export type OpencodeState = "idle" | "busy" | "unreachable" | "unknown"
 export type OpencodeSessionState = OpencodeState | "missing"
 
+// Timestamps are the server's last observed busy and idle times, in milliseconds.
+export interface OpencodeSessionActivity {
+  state: OpencodeSessionState
+  busyAt: number | null
+  idleAt: number | null
+}
+
 // Starts work on an agent and observes or stops its sessions.
 export interface OpencodeAgentClientInterface {
   // URL of the OpenCode server for this agent.
@@ -20,6 +27,9 @@ export interface OpencodeAgentClientInterface {
 
   // Observe the specific session; idle alone does not prove a new start succeeded.
   sessionState(sessionId: string): Promise<OpencodeSessionState>
+
+  // Observe the same session's activity timestamps for work completed between polls.
+  sessionActivity(sessionId: string): Promise<OpencodeSessionActivity>
 
   // Request that a session stop; a successful request does not guarantee it stopped.
   abort(sessionId: string): Promise<void>

@@ -9,8 +9,8 @@ interface Lock {
 }
 
 export class AssignmentReconciler {
-  // A freshly queued prompt can still look idle before processing actually begins.
-  private readonly locallySent = new Set<number>()
+  // Compare later activity with the session's busy time immediately before the prompt.
+  private readonly locallySent = new Map<number, number | null>()
 
   constructor(
     private readonly database: ResourceManagerDatabaseInterface,
@@ -98,7 +98,8 @@ export class AssignmentReconciler {
       return
     }
 
-    const state = await client.sessionState(execution.sessionId)
+    const activity = await client.sessionActivity(execution.sessionId)
+    const state = activity.state
     if (state === "unreachable") {
       await this.database.updateAgentStatus(agent.id, "needs_review")
       await this.fail(execution, client, "agent unreachable")
@@ -124,7 +125,10 @@ export class AssignmentReconciler {
 
     const requestedAt = Date.parse(execution.workRequestedAt)
     if (!Number.isFinite(requestedAt)) throw new Error(`Execution ${execution.id} has an invalid work request time`)
-    if (this.timeoutMs !== null && (state === "busy" || this.locallySent.has(execution.id))
+    const previousBusy = this.locallySent.get(execution.id) ?? null
+    const finishedNewWork = this.locallySent.has(execution.id) && activity.busyAt !== null && activity.idleAt !== null
+      && (previousBusy === null || activity.busyAt > previousBusy) && activity.idleAt >= activity.busyAt
+    if (this.timeoutMs !== null && (state === "busy" || (this.locallySent.has(execution.id) && !finishedNewWork))
       && this.now().getTime() - requestedAt >= this.timeoutMs) {
       await this.database.updateAgentStatus(agent.id, "needs_review")
       await this.fail(execution, client, "execution timed out")
@@ -142,9 +146,14 @@ export class AssignmentReconciler {
       return
     }
 
+    // A new busy/idle interval can prove work happened even if both events fell between polls.
+    // Older activity on a reused session does not count. Restart follows the agreed idle rule.
+    if (this.locallySent.has(execution.id)) {
+      if (!finishedNewWork) return
+      this.locallySent.delete(execution.id)
+    }
+
     // A session can be idle while another session on the same server is still busy.
-    // After a restart, the agreed recovery rule accepts idle without observed busy.
-    if (this.locallySent.has(execution.id)) return
     const agentState: OpencodeState = await client.state()
     if (agentState === "unreachable") {
       await this.database.updateAgentStatus(agent.id, "needs_review")
@@ -156,8 +165,10 @@ export class AssignmentReconciler {
   }
 
   private async send(id: number, sessionId: string, title: string, description: string, client: OpencodeAgentClientInterface): Promise<void> {
+    const activity = await client.sessionActivity(sessionId)
+    if (activity.state !== "idle") throw new Error(`Cannot send to session ${sessionId}: state is ${activity.state}`)
     console.log(`Sending work for execution ${id}, session ${sessionId}`)
-    this.locallySent.add(id)
+    this.locallySent.set(id, activity.busyAt)
     try {
       await client.prompt(sessionId, `${title}\n\n${description}`)
     } finally {

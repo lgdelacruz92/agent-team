@@ -140,3 +140,14 @@ test("distinguishes a missing session from HTTP errors and network failures", as
   assert.equal(await agent.sessionState("ses_1"), "unknown")
   assert.equal(await agent.sessionState("ses_1"), "unreachable")
 })
+
+test("exposes validated session activity timestamps", async (t) => {
+  const responses = [Response.json({ data: { id: "ses_1", time: { busy: 10, idle: 20 } } }),
+    Response.json({ data: { id: "ses_1", time: {} } }),
+    Response.json({ data: { id: "ses_1", time: { busy: "bad" } } })]
+  t.mock.method(globalThis, "fetch", async () => responses.shift()!)
+  const agent = new OpencodeAgentClient("http://opencode.test")
+  assert.deepEqual(await agent.sessionActivity("ses_1"), { state: "idle", busyAt: 10, idleAt: 20 })
+  assert.deepEqual(await agent.sessionActivity("ses_1"), { state: "idle", busyAt: null, idleAt: null })
+  assert.deepEqual(await agent.sessionActivity("ses_1"), { state: "unknown", busyAt: null, idleAt: null })
+})

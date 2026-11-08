@@ -1,12 +1,12 @@
 # Agent resource manager session context
 
-Estimated reading time: 5 minutes (150 WPM)
+Estimated reading time: 6 minutes (150 WPM)
 
 ## Working agreement
 
 - After each user prompt, update these notes with relevant context, decisions, and project status alongside the requested work. Keep this handoff concise; preserve historical detail in [the archive](session-history-archive.md). Read the archive only when a specific historical question requires it.
 - Favor understandable code over speed and practical handling with human monitoring.
-- For this session, the user explicitly prefers autonomous, long-running implementation over slow, step-by-step iteration.
+- For this session, the user preferred autonomous, long-running implementation. After that implementation, they asked to discuss the three remaining real-dispatch items one at a time.
 - Use **open** only for topics not yet discussed. Distinguish decisions, deferred choices, and implementation details.
 - A resume request authorizes context gathering and note updates, not implementation, starting services, infrastructure changes, or commits.
 
@@ -28,11 +28,14 @@ Estimated reading time: 5 minutes (150 WPM)
 
 ## Remaining work and deferred details
 
-- Verify the real OpenCode and Vikunja APIs and cross-controller coordination before real dispatch. A session prompted by the current process must be observed busy before success; fast work missed between polls can remain reserved until restart or timeout. The agreed restart rule accepts an idle, ready session with recorded work as success.
+- The user asked to skip deployed API verification and knows how to connect Vikunja; actual API compatibility and cross-controller coordination remain unverified. Fast work can now be recognized by a newer completed busy/idle interval compared with its pre-prompt baseline. If timestamps are absent or do not advance, the assignment can still wait until restart or timeout. The agreed restart rule accepts an idle, ready session with recorded work as success.
 - The execution timeout is configurable but disabled by default. Persistent-fetch alert timing and delivery, stale-lock warning threshold and human recovery steps, and logging retention and monitoring remain deferred. Fetch failures are logged each pass; a separate alert is not implemented.
 
 ## Recent context
 
+- User approved using session busy/idle timestamps to recognize work completed between polls. Implemented an in-memory pre-prompt baseline and validated newer completed intervals, including reused sessions and timeout cases. All 46 manager tests, the build, and application/test typechecks passed. Controlled tests do not establish deployed API compatibility.
+- User has a Vikunja server and knows how to hook it up; they asked to skip deployed API verification. This is not evidence the manager's deployed API assumptions were tested.
+- User wants to go through deployed API verification, fast-task readiness, and alerting/stale-lock recovery one item at a time, starting with deployed API verification.
 - User requested autonomous implementation of the full sequence flow for this session. Implemented the core reconciliation, integrations, recovery and locking. Verification: 40 manager tests and 101 scheduler tests passed; manager build and application/test typechecks passed. No live agents or user database were started or changed.
 - Resumed the project, checked source and shared SQL against the notes, and recorded the stale URL-column statement. No services or implementation work were started.
 - User requested a compact handoff to reduce resume context usage and asked the `project-resume` skill to exclude package directories such as `node_modules`. Full previous per-prompt history is preserved in [the archive](session-history-archive.md).

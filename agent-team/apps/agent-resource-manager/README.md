@@ -23,7 +23,7 @@ Set `VIKUNJA_URL`, `VIKUNJA_API_TOKEN`, `VIKUNJA_PROJECT_ID`, and `VIKUNJA_VIEW_
 
 An unreachable agent or timed-out execution sets `needs_review`. An `unknown` result or missing URL leaves the existing status unchanged, so the Ticket Scheduler may still select an agent whose stored status is `idle`. A recovered agent is not automatically cleared from `needs_review`.
 
-The `resource-manager-pass` lock prevents simultaneous manager passes. A crash can leave this lock or `ticket-scheduling` behind; neither is automatically cleared. A person must investigate stale locks before recovery. A freshly sent prompt must be observed busy before this process treats it as successful; a fast task that finishes between polls can remain reserved until a restart or be marked failed at the configured timeout. On restart, the agreed recovery rule accepts a recorded request whose session is idle and ready as successful.
+The `resource-manager-pass` lock prevents simultaneous manager passes. A crash can leave this lock or `ticket-scheduling` behind; neither is automatically cleared. A person must investigate stale locks before recovery. Before sending a prompt, the manager records the session's busy timestamp in memory. It can recognize a fast task from a newer completed busy/idle interval even if both events occur between polls. If timestamps are absent or do not advance, it waits for a confirmed busy state or the configured timeout. On restart, the agreed recovery rule accepts a recorded request whose session is idle and ready as successful.
 
 For the shared database prerequisite, see [setup](docs/setup.md).
 

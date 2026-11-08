@@ -1,5 +1,5 @@
 // Starts and observes sessions on one OpenCode server.
-import type { OpencodeAgentClientInterface, OpencodeSessionState, OpencodeState } from "../interfaces/opencode-agent-client.interface.js"
+import type { OpencodeAgentClientInterface, OpencodeSessionActivity, OpencodeSessionState, OpencodeState } from "../interfaces/opencode-agent-client.interface.js"
 
 // The frontend controller uses the same request timeout for OpenCode calls.
 const defaultTimeoutMs = 30_000
@@ -125,23 +125,30 @@ export class OpencodeAgentClient implements OpencodeAgentClientInterface {
   }
 
   async sessionState(sessionId: string): Promise<OpencodeSessionState> {
+    return (await this.sessionActivity(sessionId)).state
+  }
+
+  async sessionActivity(sessionId: string): Promise<OpencodeSessionActivity> {
+    const withoutTimes = (state: OpencodeSessionState): OpencodeSessionActivity => ({ state, busyAt: null, idleAt: null })
     let response: Response
     try {
       response = await this.call(this.sessionPath(sessionId))
     } catch {
-      return "unreachable"
+      return withoutTimes("unreachable")
     }
-    if (response.status === 404) return "missing"
-    if (!response.ok) return "unknown"
+    if (response.status === 404) return withoutTimes("missing")
+    if (!response.ok) return withoutTimes("unknown")
     try {
       const body: unknown = await response.json()
-      if (!isRecord(body) || !isRecord(body.data) || body.data.id !== sessionId || !isRecord(body.data.time)) return "unknown"
+      if (!isRecord(body) || !isRecord(body.data) || body.data.id !== sessionId || !isRecord(body.data.time)) return withoutTimes("unknown")
       const { busy, idle } = body.data.time
       if ((busy !== undefined && (typeof busy !== "number" || !Number.isFinite(busy)))
-        || (idle !== undefined && (typeof idle !== "number" || !Number.isFinite(idle)))) return "unknown"
-      return typeof busy === "number" && (idle === undefined || (typeof idle === "number" && idle < busy)) ? "busy" : "idle"
+        || (idle !== undefined && (typeof idle !== "number" || !Number.isFinite(idle)))) return withoutTimes("unknown")
+      const busyAt = typeof busy === "number" ? busy : null
+      const idleAt = typeof idle === "number" ? idle : null
+      return { state: busyAt !== null && (idleAt === null || idleAt < busyAt) ? "busy" : "idle", busyAt, idleAt }
     } catch {
-      return "unknown"
+      return withoutTimes("unknown")
     }
   }
 

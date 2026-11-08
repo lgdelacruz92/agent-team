@@ -142,7 +142,7 @@ Dark blue groups are outside the Resource Manager app. Interactions are logical,
 
 - Agent timeout value and when persistent task-fetch failures trigger an alert. The timeout is configurable but disabled by default; failures are logged each pass. The Ticket Scheduler's attempt limit defaults to 3 and is configurable.
 - Stale-lock warning threshold and human recovery steps, explicitly deferred for later.
-- Verify session identification and readiness against the deployed OpenCode API. A task that finishes between polls without being observed busy can remain reserved until restart or configured timeout.
+- Verify session identification and readiness against the deployed OpenCode API. Fast tasks can be recognized from a newer completed busy/idle interval; if timestamps are absent or do not advance, the assignment can remain reserved until restart or configured timeout.
 - Coordination with other controllers and how humans clear agent or ticket flags. The shared lock and key failure handling are implemented; the manager also uses a pass lock that requires human review if left behind by a crash.
 
 These are discussed topics, not necessarily new questions for the user. Work through implementation details as we build, and revisit deferred decisions when needed.

@@ -19,12 +19,17 @@ class FakeAgent implements OpencodeAgentClientInterface {
   readonly url = "http://agent"
   serverState: OpencodeState = "idle"
   session: OpencodeSessionState = "idle"
+  busyAt: number | null = null
+  idleAt: number | null = null
   prompts: string[] = []
   created = 0
   aborted = 0
   promptError = false
   async state() { return this.serverState }
   async sessionState() { return this.session }
+  async sessionActivity() {
+    return { state: this.session, busyAt: this.session === "busy" ? this.busyAt ?? 10 : this.busyAt, idleAt: this.idleAt }
+  }
   async createSession() { this.created += 1; return `ses_${this.created}` }
   async prompt(_id: string, text: string) { this.prompts.push(text); if (this.promptError) throw new Error("uncertain prompt") }
   async abort() { this.aborted += 1 }
@@ -185,6 +190,77 @@ test("does not mistake the brief idle period after sending for completion; resta
     const restarted = new AssignmentReconciler(database, vikunja, new SharedLock(db), () => agent)
     await restarted.runOnce()
     assert.equal((await database.getLatestExecution(1))?.status, "succeeded")
+  } finally { db.close() }
+})
+
+test("recognizes a busy and idle interval that happened entirely between polls", async () => {
+  const { db, agent, database, manager } = setup()
+  try {
+    await manager.runOnce()
+    agent.busyAt = 10
+    agent.idleAt = 20
+    await manager.runOnce()
+    assert.equal((await database.getLatestExecution(1))?.status, "succeeded")
+  } finally { db.close() }
+})
+
+test("does not mistake old activity on a reused session for the new prompt", async () => {
+  const { db, agent, database, manager } = setup()
+  try {
+    const execution = await database.createExecution(1, "2026-01-01T00:00:00.000Z")
+    await database.saveSession(execution.id, "old")
+    agent.busyAt = 10
+    agent.idleAt = 20
+    await manager.runOnce()
+    await manager.runOnce()
+    assert.equal((await database.getLatestExecution(1))?.status, "starting")
+    agent.busyAt = 30
+    agent.idleAt = 40
+    await manager.runOnce()
+    assert.equal((await database.getLatestExecution(1))?.status, "succeeded")
+  } finally { db.close() }
+})
+
+test("requires a completed interval and an idle server before success", async () => {
+  const { db, agent, database, manager } = setup()
+  try {
+    await manager.runOnce()
+    agent.busyAt = 10
+    await manager.runOnce()
+    assert.equal((await database.getLatestExecution(1))?.status, "starting")
+    agent.idleAt = 20
+    agent.serverState = "busy"
+    await manager.runOnce()
+    assert.equal((await database.getLatestExecution(1))?.status, "starting")
+    agent.serverState = "idle"
+    await manager.runOnce()
+    assert.equal((await database.getLatestExecution(1))?.status, "succeeded")
+  } finally { db.close() }
+})
+
+test("recognized completed activity wins over an elapsed timeout", async () => {
+  const { db, agent, database, manager } = setup(1)
+  try {
+    await manager.runOnce()
+    db.prepare("UPDATE executions SET work_requested_at = ? WHERE id = 1").run("2026-01-01T00:00:00.000Z")
+    agent.busyAt = 10
+    agent.idleAt = 20
+    await manager.runOnce()
+    assert.equal((await database.getLatestExecution(1))?.status, "succeeded")
+    assert.equal(agent.aborted, 0)
+  } finally { db.close() }
+})
+
+test("does not send work when the pre-send session activity cannot be observed", async () => {
+  const { db, agent, database, manager } = setup()
+  try {
+    agent.session = "unknown"
+    await assert.rejects(manager.runOnce(), AggregateError)
+    assert.equal(agent.prompts.length, 0)
+    assert.equal((await database.getLatestExecution(1))?.workRequestedAt, null)
+    agent.session = "idle"
+    await manager.runOnce()
+    assert.equal(agent.prompts.length, 1)
   } finally { db.close() }
 })
 
