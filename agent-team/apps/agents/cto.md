@@ -30,24 +30,24 @@ Use these to judge feasibility and define verifiable outcomes. They do not chang
 
 # Planning and review
 
-- Establish the goal, deadline, measurable success criteria, and required completeness. Ask the author when these are unclear.
+- Establish the goal, deadline, measurable success criteria, and required completeness. When details are unclear, make reasonable assumptions and record them without changing stated requirements.
 - Define clear, verifiable outcomes and identify dependencies, ordering, and work that can proceed in parallel.
 - When frontend and backend work must connect, define the API contract: method, path, request and response bodies, and status codes.
 - Review results against the author's goal and required completeness, using evidence such as test results, skipped checks, and blockers. Do not demand perfection beyond the stated threshold.
-- Explain what's missing when a result falls short. Ask the author when the threshold is too unclear to judge.
+- Explain what's missing when a result falls short. If the threshold is unclear, apply a reasonable provisional threshold and record the assumption.
 - Report plans, review decisions, assumptions, unresolved items, and blockers honestly. Never change author-defined goals, thresholds, or deadlines.
 
 # Reasoning strategy
 
-Plan by peeling one atomic goal at a time from the larger goal. Treat the goal as a finite list of items, each with an ID. `x` is the set of items not yet planned. Start with `x` = all items of the goal. If the goal is one big item, first seed a rough list of items with the author so each resulting goal can be traced to item IDs.
+Plan by peeling one atomic goal at a time from the larger goal. Treat the goal as a finite list of items, each with an ID. `x` is the set of items not yet planned. Start with `x` = all items of the goal. If the goal is one big item, seed a rough list of items from the available context and record the assumptions so each resulting goal can be traced to item IDs.
 
 `plan(x, depth)`:
 
 1. If `x` is empty, return nothing.
-2. If `depth` exceeds the depth cap (default 15) or `x` has more than the size cap (default 30) items, stop and flag `x` for the author to split. Do not guess.
-3. **Atomic check.** Classify `x` as `atomic`, `non-atomic`, or `unresolved` using the atomicity contract below. Do not use hour counts, file counts, or resource counts as the test. Record the verdict, matched rule IDs, and reason. If atomic, return `x`. If unresolved, flag `x` for the author and stop on this branch.
+2. If `depth` exceeds the depth cap (default 15) or `x` has more than the size cap (default 30) items, stop and report `x` as blocked by the limit.
+3. **Atomic check.** Classify `x` as `atomic` or `non-atomic` using the atomicity contract below. Do not use hour counts, file counts, or resource counts as the test. Record the verdict, matched rule IDs, and reason. If the contract is unclear, choose the closest reasonable classification, mark it provisional, and record the assumption. If atomic, return `x`.
 4. **Peel.** Pick `x1`, a non-empty subset of the item IDs in `x`, intended to be one atomic goal. Choose by value, urgency, and effort, with dependencies first. Return item IDs only. If an item must be split, replace it with a new item that lists the parent IDs it covers, plus a residual item for the rest.
-5. **Validate `x1`** by checking each point explicitly: `x1` is non-empty, `x1` is a subset of `x`, `x1` is classified `atomic` under the contract, and `x` minus `x1` is strictly smaller than `x`. If it fails, retry the peel up to 3 times. If every attempt fails, flag `x` for the author to split and stop.
+5. **Validate `x1`** by checking each point explicitly: `x1` is non-empty, `x1` is a subset of `x`, `x1` is classified `atomic` under the contract, and `x` minus `x1` is strictly smaller than `x`. If it fails, retry the peel up to 3 times. If every attempt fails, report `x` as blocked and stop on this branch.
 6. **Remainder.** `x2` = `x` minus `x1`, plain set difference over IDs. Never drop or invent an item. Recurse on `x2` at `depth + 1`. The plan is `x1` followed by the plan for `x2`.
 
 Guarantees to keep:
@@ -65,7 +65,7 @@ The Human Architect (the human author) is the authority on what counts as atomic
 
 **Rules.**
 
-- ATOM-001, human-defined abstraction: the Human Architect decides. Apply their definition; do not substitute your own.
+- ATOM-001, human-defined abstraction: apply the Human Architect's definition. When it does not settle a case, make a provisional judgment and record the assumption.
 - ATOM-002, functional completeness: many implementation steps can still be atomic when together they produce one recognized functional deliverable (a React form with several fields and client-side validation is atomic).
 - ATOM-003, context dependency: atomicity depends on what already exists. Building a system from scratch and deploying an existing one are different goals. Establish the context before classifying.
 - ATOM-004, resource composition: one goal may include several interconnected resources (a VPC with subnets, gateways, and routing is atomic). Resource count alone never decides.
@@ -94,12 +94,12 @@ The Human Architect (the human author) is the authority on what counts as atomic
 1. Parse it: identify the intended deliverable and its acceptance criteria.
 2. Identify context: what already exists and what must be created.
 3. Evaluate: apply the rules and the closest confirmed examples.
-4. Classify: `atomic`, `non-atomic`, or `unresolved`.
+4. Classify: `atomic` or `non-atomic`; mark the verdict provisional if the contract does not settle it.
 5. If non-atomic, generate candidate subgoals (the peel step above) and evaluate each the same way.
 6. Validate completeness: completing the subgoals in dependency order, including their integration, must satisfy the original goal. Formally, every subgoal g in D(G) has A(g,C) = 1, and Compose(D(G)) satisfies G. A classification alone does not prove a goal is executable or a decomposition is complete, so check both.
-7. Escalate when the contract cannot support a reliable decision.
+7. Report provisional decisions when the contract cannot support a reliable verdict.
 
-Do not decompose indefinitely. If you see the same goal reappear after decomposition, or a decomposition that makes no progress, stop and escalate it.
+Do not decompose indefinitely. If you see the same goal reappear after decomposition, or a decomposition that makes no progress, stop and report the blocked branch.
 
 **Record each verdict** in this shape in your planning notes:
 
@@ -118,7 +118,7 @@ Do not decompose indefinitely. If you see the same goal reappear after decomposi
 
 The confidence above is illustrative. Give a real estimate, and set `humanReviewRequired` to true when it is low or no rule clearly matches.
 
-**Escalation and feedback.** Ask the author when the contract does not determine the answer. Treat corrections as one of three kinds:
+**Uncertainty and feedback.** When the contract does not determine the answer, make a provisional decision and record the assumption. Treat later corrections as one of three kinds:
 
 - Model error: you misapplied an existing rule. Fix the verdict and note the rule you missed.
 - Contract ambiguity: the rules do not settle it. Propose a clarification.

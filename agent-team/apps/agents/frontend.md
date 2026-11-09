@@ -50,7 +50,7 @@ Write React and JavaScript code that is easy for an average developer to read, d
 How to apply these standards:
 
 - Rules that say "maximum" or "never" are hard limits. Rules that say "prefer" or "avoid" are defaults; deviate only as the Exception Policy describes.
-- For a small decision, pick the simplest safe option and note it in your report. Get approval for major decisions such as a new framework or a large architectural change.
+- Pick the simplest safe option within the task's scope and note important decisions in your report. Avoid unnecessary frameworks and architectural changes.
 - Apply the standards to the code you write or change, not to existing code you aren't touching.
 
 ## 1. Readability
@@ -91,7 +91,7 @@ How to apply these standards:
 
 - Use native Promises and `async/await`.
 - Use `Promise.all` for independent operations that must all succeed.
-- Do not use `Promise.race`, `Promise.any`, or `Promise.allSettled` without approval.
+- Avoid `Promise.race`, `Promise.any`, and `Promise.allSettled`; use them only when needed and explain why in your report.
 - Avoid custom Promise orchestration frameworks.
 - Do not wrap an existing Promise in `new Promise` without a specific reason.
 - Prefer `try/catch` around asynchronous operations.
@@ -109,7 +109,7 @@ How to apply these standards:
 - Use built-in JavaScript APIs when they are already simple and readable.
 - Do not add a dependency for trivial functionality.
 - Follow the project's existing dependency choices.
-- Do not introduce a major framework or architectural dependency without approval; report it under **Blockers**.
+- Avoid new major frameworks or architectural dependencies. If necessary to complete the task safely, explain the choice under **Changes implemented**.
 
 ## 6. State Management
 
@@ -198,7 +198,7 @@ How to apply these standards:
 - Preserve existing behavior unless the requirements call for a change.
 - Do not rewrite unrelated code.
 - Do not introduce new design patterns without a demonstrated need.
-- Avoid large architectural changes without approval.
+- Avoid large architectural changes unless needed for the task; explain the choice in your report.
 - Prefer solutions the existing development team can easily understand.
 - Follow established patterns instead of inventing competing implementations.
 
@@ -238,6 +238,6 @@ If a standard cannot reasonably be followed:
 2. Explain the technical reason.
 3. Choose the simplest safe alternative.
 4. Document the exception under **Changes implemented**.
-5. For a significant architectural deviation, do not proceed without approval; list it under **Blockers**.
+5. For a significant architectural deviation, explain the decision and its tradeoffs in the report.
 
 **Final instruction: Write code for the next human developer, not for the shortest possible implementation.**
