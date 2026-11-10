@@ -29,7 +29,7 @@ export class AssignmentReconciler {
         const agent = agents.get(assignment.agentId)
         const ticket = await this.database.getTicket(assignment.ticketId)
         if (!agent || !ticket) throw new Error(`Assignment ${assignment.id} has a missing agent or ticket`)
-        await this.reconcile(assignment, ticket, agent)
+        await this._reconcile(assignment, ticket, agent)
       } catch (error) {
         console.error(`Could not reconcile assignment ${assignment.id}:`, error)
         errors.push(error)
@@ -38,7 +38,7 @@ export class AssignmentReconciler {
     if (errors.length) throw new AggregateError(errors, "One or more assignments could not be reconciled")
   }
 
-  private async reconcile(assignment: Assignment, ticket: Ticket, agent: Agent): Promise<void> {
+  private async _reconcile(assignment: Assignment, ticket: Ticket, agent: Agent): Promise<void> {
     let execution = await this.database.getLatestExecution(assignment.id)
     if (execution?.status === "succeeded" || (execution?.status === "failed" && execution.failureReason !== "missing session before work request")) {
       if (execution.status === "succeeded" && agent.status === "busy" && agent.url) {
@@ -48,9 +48,9 @@ export class AssignmentReconciler {
       }
       if (execution.status === "failed" && execution.sessionId && agent.url
         && (execution.failureReason === "agent unreachable" || execution.failureReason === "execution timed out")) {
-        await this.tryAbort(this.createClient(agent.url), execution.sessionId)
+        await this._tryAbort(this.createClient(agent.url), execution.sessionId)
       }
-      await this.complete(assignment, ticket, execution)
+      await this._complete(assignment, ticket, execution)
       return
     }
     if (execution?.status === "failed") execution = null
@@ -60,41 +60,41 @@ export class AssignmentReconciler {
     if (!execution) {
       // A failed fetch does not create an execution or count as an attempt.
       const task = await this.vikunja.getTask(ticket.vikunjaTaskId)
-      execution = await this.database.createExecution(assignment.id, this.timestamp())
+      execution = await this.database.createExecution(assignment.id, this._timestamp())
       if (agent.status === "needs_review") {
-        await this.fail(execution, client, "agent needs review")
+        await this._fail(execution, client, "agent needs review")
         return
       }
       const state = await client.state()
       if (state === "unreachable") {
         await this.database.updateAgentStatus(agent.id, "needs_review")
-        await this.fail(execution, client, "agent unreachable")
+        await this._fail(execution, client, "agent unreachable")
         return
       }
       if (state !== "idle") return
       const sessionId = await client.createSession(task.title)
       await this.database.saveSession(execution.id, sessionId)
-      await this.send(execution.id, sessionId, task.title, task.description, client)
+      await this._send(execution.id, sessionId, task.title, task.description, client)
       return
     }
 
     if (!execution.sessionId) {
       if (execution.workRequestedAt !== null) throw new Error(`Execution ${execution.id} has a recorded request but no session ID`)
       if (agent.status === "needs_review") {
-        await this.fail(execution, client, "agent needs review")
+        await this._fail(execution, client, "agent needs review")
         return
       }
       const state = await client.state()
       if (state === "unreachable") {
         await this.database.updateAgentStatus(agent.id, "needs_review")
-        await this.fail(execution, client, "agent unreachable")
+        await this._fail(execution, client, "agent unreachable")
         return
       }
       if (state !== "idle") return
       const task = await this.vikunja.getTask(ticket.vikunjaTaskId)
       const sessionId = await client.createSession(task.title)
       await this.database.saveSession(execution.id, sessionId)
-      await this.send(execution.id, sessionId, task.title, task.description, client)
+      await this._send(execution.id, sessionId, task.title, task.description, client)
       return
     }
 
@@ -102,12 +102,12 @@ export class AssignmentReconciler {
     const state = activity.state
     if (state === "unreachable") {
       await this.database.updateAgentStatus(agent.id, "needs_review")
-      await this.fail(execution, client, "agent unreachable")
+      await this._fail(execution, client, "agent unreachable")
       return
     }
     if (state === "missing") {
       if (agent.status === "busy" && await client.state() === "idle") await this.database.updateAgentStatus(agent.id, "idle")
-      await this.fail(execution, client, execution.workRequestedAt ? "missing session after work request" : "missing session before work request")
+      await this._fail(execution, client, execution.workRequestedAt ? "missing session after work request" : "missing session before work request")
       return
     }
     if (state === "unknown") return
@@ -115,11 +115,11 @@ export class AssignmentReconciler {
     if (execution.workRequestedAt === null) {
       if (state === "busy") return
       if (agent.status === "needs_review") {
-        await this.fail(execution, client, "agent needs review")
+        await this._fail(execution, client, "agent needs review")
         return
       }
       const task = await this.vikunja.getTask(ticket.vikunjaTaskId)
-      await this.send(execution.id, execution.sessionId, task.title, task.description, client)
+      await this._send(execution.id, execution.sessionId, task.title, task.description, client)
       return
     }
 
@@ -131,13 +131,13 @@ export class AssignmentReconciler {
     if (this.timeoutMs !== null && (state === "busy" || (this.locallySent.has(execution.id) && !finishedNewWork))
       && this.now().getTime() - requestedAt >= this.timeoutMs) {
       await this.database.updateAgentStatus(agent.id, "needs_review")
-      await this.fail(execution, client, "execution timed out")
+      await this._fail(execution, client, "execution timed out")
       return
     }
 
     if (state === "busy") {
       this.locallySent.delete(execution.id)
-      if (execution.status === "starting") await this.database.markRunning(execution.id, this.timestamp())
+      if (execution.status === "starting") await this.database.markRunning(execution.id, this._timestamp())
       if (agent.status === "idle") await this.database.updateAgentStatus(agent.id, "busy")
       if (assignment.status !== "in_progress") {
         await this.vikunja.moveToColumn(ticket.vikunjaTaskId, "In progress")
@@ -157,14 +157,14 @@ export class AssignmentReconciler {
     const agentState: OpencodeState = await client.state()
     if (agentState === "unreachable") {
       await this.database.updateAgentStatus(agent.id, "needs_review")
-      await this.fail(execution, client, "agent unreachable")
+      await this._fail(execution, client, "agent unreachable")
     } else if (agentState === "idle") {
-      await this.database.finishExecution(execution.id, "succeeded", this.timestamp(), null)
+      await this.database.finishExecution(execution.id, "succeeded", this._timestamp(), null)
       if (agent.status === "busy") await this.database.updateAgentStatus(agent.id, "idle")
     }
   }
 
-  private async send(id: number, sessionId: string, title: string, description: string, client: OpencodeAgentClientInterface): Promise<void> {
+  private async _send(id: number, sessionId: string, title: string, description: string, client: OpencodeAgentClientInterface): Promise<void> {
     const activity = await client.sessionActivity(sessionId)
     if (activity.state !== "idle") throw new Error(`Cannot send to session ${sessionId}: state is ${activity.state}`)
     console.log(`Sending work for execution ${id}, session ${sessionId}`)
@@ -173,23 +173,23 @@ export class AssignmentReconciler {
       await client.prompt(sessionId, `${title}\n\n${description}`)
     } finally {
       // Even an uncertain response counts once the request was sent and recorded.
-      await this.database.recordWorkRequest(id, this.timestamp())
+      await this.database.recordWorkRequest(id, this._timestamp())
     }
   }
 
-  private async fail(execution: Execution, client: OpencodeAgentClientInterface, reason: string): Promise<void> {
-    await this.database.finishExecution(execution.id, "failed", this.timestamp(), reason)
+  private async _fail(execution: Execution, client: OpencodeAgentClientInterface, reason: string): Promise<void> {
+    await this.database.finishExecution(execution.id, "failed", this._timestamp(), reason)
     this.locallySent.delete(execution.id)
     if (execution.sessionId && reason !== "missing session before work request" && reason !== "missing session after work request") {
-      await this.tryAbort(client, execution.sessionId)
+      await this._tryAbort(client, execution.sessionId)
     }
   }
 
-  private async tryAbort(client: OpencodeAgentClientInterface, sessionId: string): Promise<void> {
+  private async _tryAbort(client: OpencodeAgentClientInterface, sessionId: string): Promise<void> {
     try { await client.abort(sessionId) } catch (error) { console.error(`Could not stop session ${sessionId}:`, error) }
   }
 
-  private async complete(assignment: Assignment, ticket: Ticket, execution: Execution): Promise<void> {
+  private async _complete(assignment: Assignment, ticket: Ticket, execution: Execution): Promise<void> {
     const owner = await this.lock.tryAcquire()
     if (!owner) return
     let completionError: unknown
@@ -199,7 +199,7 @@ export class AssignmentReconciler {
       if (current.completedAt !== null) return
       await this.vikunja.moveToColumn(ticket.vikunjaTaskId, execution.status === "succeeded" ? "Done" : "Retry")
       await this.database.updateAssignmentStatus(assignment.id, execution.status)
-      await this.database.completeAssignment(assignment.id, this.timestamp())
+      await this.database.completeAssignment(assignment.id, this._timestamp())
     } catch (error) {
       completionError = error
       throw error
@@ -216,5 +216,5 @@ export class AssignmentReconciler {
     }
   }
 
-  private timestamp(): string { return this.now().toISOString() }
+  private _timestamp(): string { return this.now().toISOString() }
 }

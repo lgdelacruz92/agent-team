@@ -19,11 +19,11 @@ export class OpencodeAgentClient implements OpencodeAgentClientInterface {
 
   // Active sessions reflect the current process, not stale persisted timestamps.
   async state(): Promise<OpencodeState> {
-    const active = await this.activeSessions()
+    const active = await this._activeSessions()
     return active.state === "ok" ? (active.ids.size > 0 ? "busy" : "idle") : active.state
   }
 
-  private async activeSessions(): Promise<{ state: "ok"; ids: Set<string> } | { state: "unknown" | "unreachable" }> {
+  private async _activeSessions(): Promise<{ state: "ok"; ids: Set<string> } | { state: "unknown" | "unreachable" }> {
     const signal = AbortSignal.timeout(this.timeoutMs)
     let endpoint: URL
 
@@ -57,7 +57,7 @@ export class OpencodeAgentClient implements OpencodeAgentClientInterface {
     return { state: "ok", ids }
   }
 
-  private async call(path: string, body?: unknown): Promise<Response> {
+  private async _call(path: string, body?: unknown): Promise<Response> {
     const response = await fetch(`${this.url.replace(/\/+$/, "")}${path}`, {
       method: body === undefined ? "GET" : "POST",
       headers: { ...this.headers, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
@@ -67,19 +67,19 @@ export class OpencodeAgentClient implements OpencodeAgentClientInterface {
     return response
   }
 
-  private async post(path: string, body: unknown): Promise<Response> {
-    const response = await this.call(path, body)
+  private async _post(path: string, body: unknown): Promise<Response> {
+    const response = await this._call(path, body)
     if (!response.ok) throw new Error(`OpenCode POST ${path} returned HTTP ${response.status}`)
     return response
   }
 
-  private sessionPath(sessionId: string): string {
+  private _sessionPath(sessionId: string): string {
     if (!sessionId) throw new Error("OpenCode session ID is required")
     return `/api/session/${encodeURIComponent(sessionId)}`
   }
 
   async createSession(title: string): Promise<string> {
-    const body: unknown = await (await this.post("/api/session", { title })).json()
+    const body: unknown = await (await this._post("/api/session", { title })).json()
     if (!isRecord(body) || !isRecord(body.data) || typeof body.data.id !== "string" || !body.data.id) {
       throw new Error("OpenCode returned an invalid session ID")
     }
@@ -87,7 +87,7 @@ export class OpencodeAgentClient implements OpencodeAgentClientInterface {
   }
 
   async prompt(sessionId: string, text: string): Promise<void> {
-    await this.post(`${this.sessionPath(sessionId)}/prompt`, { text })
+    await this._post(`${this._sessionPath(sessionId)}/prompt`, { text })
   }
 
   async sessionState(sessionId: string): Promise<OpencodeSessionState> {
@@ -98,7 +98,7 @@ export class OpencodeAgentClient implements OpencodeAgentClientInterface {
     const withoutTimes = (state: OpencodeSessionState): OpencodeSessionActivity => ({ state, busyAt: null, idleAt: null })
     let response: Response
     try {
-      response = await this.call(this.sessionPath(sessionId))
+      response = await this._call(this._sessionPath(sessionId))
     } catch {
       return withoutTimes("unreachable")
     }
@@ -112,7 +112,7 @@ export class OpencodeAgentClient implements OpencodeAgentClientInterface {
         || (idle !== undefined && (typeof idle !== "number" || !Number.isFinite(idle)))) return withoutTimes("unknown")
       const busyAt = typeof busy === "number" ? busy : null
       const idleAt = typeof idle === "number" ? idle : null
-      const active = await this.activeSessions()
+      const active = await this._activeSessions()
       const state = active.state === "ok" ? (active.ids.has(sessionId) ? "busy" : "idle") : active.state
       return { state, busyAt, idleAt }
     } catch {
@@ -121,6 +121,6 @@ export class OpencodeAgentClient implements OpencodeAgentClientInterface {
   }
 
   async abort(sessionId: string): Promise<void> {
-    await this.post(`${this.sessionPath(sessionId)}/interrupt`, {})
+    await this._post(`${this._sessionPath(sessionId)}/interrupt`, {})
   }
 }

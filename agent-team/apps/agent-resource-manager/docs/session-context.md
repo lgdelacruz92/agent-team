@@ -33,6 +33,7 @@ Estimated reading time: 10 minutes (150 WPM)
 
 ## Recent context
 
+- User requested an underscore prefix for private methods. Added an ESLint rule for TypeScript private class methods, renamed existing methods and calls, and added a rule test. Private fields and other methods are unaffected. Lint, typecheck, and all 54 tests passed.
 - User requested a linter. Added ESLint with recommended JavaScript and TypeScript rules for source and tests, plus `npm run lint`; documented intentional exceptions for lock-release error handling. Lint, typecheck, and all 53 tests passed. npm audit reports a moderate minimatch advisory in the new development dependencies; ESLint 10 does not support Node 23.
 - User asked for a plain-English explanation of `src/components/assignment-reconciler.ts` lines 43–55: handling completed executions, agent status, abort attempts, and assignment completion. No code changes requested.
 - User requested an exact manual method to make a worker eligible after its PR merges. Created [manual-done.md](../manual-done.md): pause controllers, verify the merge and database, back up, move the card, and manually complete the execution and assignment and set the agent idle in one transaction. Tested the SQL against in-memory examples. The current manager can release an idle session before a PR merges, so it must be stopped while waiting; no live database or service was changed.

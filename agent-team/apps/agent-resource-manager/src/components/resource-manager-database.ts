@@ -56,11 +56,11 @@ export class ResourceManagerDatabase extends AgentDatabase implements ResourceMa
   }
 
   async updateAssignmentStatus(id: number, status: string): Promise<void> {
-    this.update("UPDATE assignments SET status = ? WHERE id = ? AND completed_at IS NULL", status, id)
+    this._update("UPDATE assignments SET status = ? WHERE id = ? AND completed_at IS NULL", status, id)
   }
 
   async completeAssignment(id: number, completedAt: string): Promise<void> {
-    this.update("UPDATE assignments SET completed_at = ? WHERE id = ? AND completed_at IS NULL", completedAt, id)
+    this._update("UPDATE assignments SET completed_at = ? WHERE id = ? AND completed_at IS NULL", completedAt, id)
   }
 
   async getLatestExecution(assignmentId: number): Promise<Execution | null> {
@@ -76,22 +76,22 @@ export class ResourceManagerDatabase extends AgentDatabase implements ResourceMa
   }
 
   async saveSession(id: number, sessionId: string): Promise<void> {
-    this.update("UPDATE executions SET session_id = ? WHERE id = ? AND session_id IS NULL", sessionId, id)
+    this._update("UPDATE executions SET session_id = ? WHERE id = ? AND session_id IS NULL", sessionId, id)
   }
 
   async recordWorkRequest(id: number, requestedAt: string): Promise<void> {
-    this.update("UPDATE executions SET work_requested_at = ? WHERE id = ? AND work_requested_at IS NULL", requestedAt, id)
+    this._update("UPDATE executions SET work_requested_at = ? WHERE id = ? AND work_requested_at IS NULL", requestedAt, id)
   }
 
   async markRunning(id: number, startedAt: string): Promise<void> {
-    this.update("UPDATE executions SET status = 'running', started_at = COALESCE(started_at, ?) WHERE id = ? AND status = 'starting'", startedAt, id)
+    this._update("UPDATE executions SET status = 'running', started_at = COALESCE(started_at, ?) WHERE id = ? AND status = 'starting'", startedAt, id)
   }
 
   async finishExecution(id: number, status: "succeeded" | "failed", finishedAt: string, reason: string | null): Promise<void> {
-    this.update("UPDATE executions SET status = ?, finished_at = ?, failure_reason = ? WHERE id = ? AND status IN ('starting', 'running')", status, finishedAt, reason, id)
+    this._update("UPDATE executions SET status = ?, finished_at = ?, failure_reason = ? WHERE id = ? AND status IN ('starting', 'running')", status, finishedAt, reason, id)
   }
 
-  private update(sql: string, ...values: (number | string | null)[]): void {
+  private _update(sql: string, ...values: (number | string | null)[]): void {
     if (this.db.prepare(sql).run(...values).changes !== 1) throw new Error("Shared database update did not affect one row")
   }
 }

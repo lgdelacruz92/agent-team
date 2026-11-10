@@ -34,7 +34,7 @@ export class Vikunja implements VikunjaInterface {
     if (!positiveInteger(this.timeoutMs)) throw new Error("Vikunja timeout must be a positive integer")
   }
 
-  private async request(path: string, body?: unknown): Promise<Response> {
+  private async _request(path: string, body?: unknown): Promise<Response> {
     const response = await this.fetchRequest(`${this.baseUrl}${path}`, {
       method: body === undefined ? "GET" : "POST",
       headers: { Authorization: `Bearer ${this.options.token}`, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
@@ -47,7 +47,7 @@ export class Vikunja implements VikunjaInterface {
 
   async getTask(taskId: number): Promise<VikunjaTask> {
     if (!positiveInteger(taskId)) throw new Error("Vikunja task ID must be a positive integer")
-    const task: unknown = await (await this.request(`/api/v1/tasks/${taskId}`)).json()
+    const task: unknown = await (await this._request(`/api/v1/tasks/${taskId}`)).json()
     if (!isRecord(task) || task.id !== taskId || typeof task.title !== "string" || typeof task.description !== "string") {
       throw new Error("Vikunja returned invalid task details")
     }
@@ -57,14 +57,14 @@ export class Vikunja implements VikunjaInterface {
   async moveToColumn(taskId: number, column: ResourceManagerColumn): Promise<void> {
     if (!positiveInteger(taskId)) throw new Error("Vikunja task ID must be a positive integer")
     const base = `/api/v1/projects/${this.options.projectId}/views/${this.options.viewId}`
-    const buckets: unknown = await (await this.request(`${base}/tasks?page=1&per_page=50`)).json()
+    const buckets: unknown = await (await this._request(`${base}/tasks?page=1&per_page=50`)).json()
     if (!Array.isArray(buckets) || buckets.some((bucket) => !isRecord(bucket) || !positiveInteger(bucket.id) || typeof bucket.title !== "string")) {
       throw new Error("Vikunja returned invalid board columns")
     }
     const destinations = buckets.filter((bucket) => bucket.title === column)
     if (destinations.length !== 1) throw new Error(`Vikunja board must have exactly one ${column} column`)
     const bucketId: number = destinations[0].id
-    await this.request(`${base}/buckets/${bucketId}/tasks`, {
+    await this._request(`${base}/buckets/${bucketId}/tasks`, {
       task_id: taskId, bucket_id: bucketId, project_view_id: this.options.viewId, project_id: this.options.projectId,
     })
   }
