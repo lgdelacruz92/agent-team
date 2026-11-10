@@ -1,11 +1,12 @@
 # Agent resource manager session context
 
-Estimated reading time: 10 minutes (150 WPM)
+Estimated reading time: 11 minutes (150 WPM)
 
 ## Working agreement
 
 - After each user prompt, update these notes with relevant context, decisions, and project status alongside the requested work. Keep this handoff concise; preserve historical detail in [the archive](session-history-archive.md). Read the archive only when a specific historical question requires it.
 - Favor understandable code over speed and practical handling with human monitoring.
+- Prefer short, readable functions with names that explain what the code does.
 - For this session, the user preferred autonomous, long-running implementation. After that implementation, they asked to discuss the three remaining real-dispatch items one at a time.
 - Use **open** only for topics not yet discussed. Distinguish decisions, deferred choices, and implementation details.
 - A resume request authorizes context gathering and note updates, not implementation, starting services, infrastructure changes, or commits.
@@ -33,6 +34,8 @@ Estimated reading time: 10 minutes (150 WPM)
 
 ## Recent context
 
+- User requested breaking the long `_reconcile` method into logical private functions. Extracted starting and recovering work, session monitoring, progress, and failure handling without changing the intended flow; added a fetch-order recovery test. Lint, typecheck, and all 57 tests passed; the focused reconciliation suite also passed after the test was strengthened.
+- User requested extracting the finished-execution branch from `_reconcile` for readability. Moved it into `_handleFinishedExecution` without changing its retry, abort, agent-state, or completion behavior. Added focused coverage; lint, typecheck, and all 56 tests passed.
 - User requested an underscore prefix for private methods. Added an ESLint rule for TypeScript private class methods, renamed existing methods and calls, and added a rule test. Private fields and other methods are unaffected. Lint, typecheck, and all 54 tests passed.
 - User requested a linter. Added ESLint with recommended JavaScript and TypeScript rules for source and tests, plus `npm run lint`; documented intentional exceptions for lock-release error handling. Lint, typecheck, and all 53 tests passed. npm audit reports a moderate minimatch advisory in the new development dependencies; ESLint 10 does not support Node 23.
 - User asked for a plain-English explanation of `src/components/assignment-reconciler.ts` lines 43–55: handling completed executions, agent status, abort attempts, and assignment completion. No code changes requested.

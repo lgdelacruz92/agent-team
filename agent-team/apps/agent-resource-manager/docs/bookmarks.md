@@ -4,7 +4,9 @@ Estimated reading time: 4 minutes (150 WPM)
 
 ## Current task
 
-- ESLint requires TypeScript private class methods to start with `_`; existing methods were renamed and a rule test was added. Lint, typecheck, and all 54 tests passed. Use `npm run lint`.
+- Refactored `_reconcile` in `src/components/assignment-reconciler.ts` into shorter, descriptive private methods for starting, recovering, and monitoring work. Lint, typecheck, and all 57 tests passed.
+- User prefers short, readable functions whose names explain what they do.
+- ESLint requires TypeScript private class methods to start with `_`. Use `npm run lint`.
 - npm audit reports a moderate minimatch advisory in the linting dependencies; ESLint 10 does not support Node 23.
 
 ## Previous task: PR merge policy

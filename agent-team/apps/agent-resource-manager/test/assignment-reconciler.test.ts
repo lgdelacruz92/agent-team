@@ -87,6 +87,41 @@ test("dispatches, observes and completes while coordinating with the scheduler l
   } finally { db.close() }
 })
 
+test("finished successful executions reconcile the agent state before completion", async () => {
+  const cases: { state: OpencodeState; expectedStatus: string }[] = [
+    { state: "idle", expectedStatus: "idle" },
+    { state: "unreachable", expectedStatus: "needs_review" },
+    { state: "busy", expectedStatus: "busy" },
+    { state: "unknown", expectedStatus: "busy" },
+  ]
+  for (const { state, expectedStatus } of cases) {
+    const { db, agent, vikunja, database, manager } = setup()
+    try {
+      const execution = await database.createExecution(1, "2026-01-01T00:00:00.000Z")
+      await database.finishExecution(execution.id, "succeeded", "2026-01-01T00:01:00.000Z", null)
+      await database.updateAgentStatus(1, "busy")
+      agent.serverState = state
+      await manager.runOnce()
+      assert.equal((await database.listAgents())[0].status, expectedStatus)
+      assert.deepEqual(vikunja.moves, ["Done"])
+      assert.ok((await database.getAssignment(1))?.completedAt)
+    } finally { db.close() }
+  }
+})
+
+test("finished timed-out execution retries abort before moving the ticket to Retry", async () => {
+  const { db, agent, vikunja, database, manager } = setup()
+  try {
+    const execution = await database.createExecution(1, "2026-01-01T00:00:00.000Z")
+    await database.saveSession(execution.id, "old")
+    await database.finishExecution(execution.id, "failed", "2026-01-01T00:01:00.000Z", "execution timed out")
+    await manager.runOnce()
+    assert.equal(agent.aborted, 1)
+    assert.deepEqual(vikunja.moves, ["Retry"])
+    assert.ok((await database.getAssignment(1))?.completedAt)
+  } finally { db.close() }
+})
+
 test("logs every task fetch failure and preserves the reservation without creating an attempt", async (t) => {
   const { db, vikunja, database, manager } = setup()
   try {
@@ -117,6 +152,32 @@ test("reuses a saved idle session and watches a busy unrecorded session", async 
     assert.equal(agent.created, 0)
     assert.equal(agent.prompts.length, 1)
     assert.ok((await database.getLatestExecution(1))?.workRequestedAt)
+  } finally { db.close() }
+})
+
+test("fetches before creating an execution, but waits for an idle agent before fetching again on recovery", async () => {
+  const { db, agent, vikunja, database, manager } = setup()
+  try {
+    let fetches = 0
+    const getTask = vikunja.getTask.bind(vikunja)
+    vikunja.getTask = async (id) => {
+      fetches += 1
+      if (fetches === 1) assert.equal(await database.getLatestExecution(1), null)
+      return getTask(id)
+    }
+    agent.serverState = "busy"
+    await manager.runOnce()
+    assert.equal(fetches, 1)
+    assert.ok(await database.getLatestExecution(1))
+    assert.equal(agent.created, 0)
+
+    await manager.runOnce()
+    assert.equal(fetches, 1)
+    agent.serverState = "idle"
+    await manager.runOnce()
+    assert.equal(fetches, 2)
+    assert.equal(agent.created, 1)
+    assert.equal(agent.prompts.length, 1)
   } finally { db.close() }
 })
 
