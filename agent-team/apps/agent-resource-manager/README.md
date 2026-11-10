@@ -7,6 +7,7 @@ This app checks registered agents and reconciles Ticket Scheduler assignments: f
 ## Run
 
 Requires Node.js 22.13 or newer.
+ESLint supports Node.js 22.13–22.x or 24 and newer; it does not support Node.js 23.
 
 ```sh
 npm install
@@ -14,6 +15,8 @@ npm run dev
 ```
 
 **Starting the app can dispatch real work, change agent status, and move Vikunja cards.** It checks every 30 seconds by default; `RESOURCE_MANAGER_POLL_MS` changes the interval. Stop it with Ctrl+C. To run the compiled app, use `npm run build` followed by `npm start`. Run tests with `npm test`.
+
+Run `npm run lint` to check the TypeScript source and tests with ESLint.
 
 The default database is `apps/shared-db/db.sqlite`, shared with the Ticket Scheduler. `RESOURCE_MANAGER_DB_PATH` overrides it; if either app is overridden, ensure both still point to the same file.
 

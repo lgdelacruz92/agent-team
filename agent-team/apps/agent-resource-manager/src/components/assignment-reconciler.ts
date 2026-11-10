@@ -207,7 +207,10 @@ export class AssignmentReconciler {
       try {
         await this.lock.release(owner)
       } catch (error) {
+        // Surface release failures, including both errors if completion also failed.
+        // eslint-disable-next-line no-unsafe-finally, preserve-caught-error
         if (completionError !== undefined) throw new AggregateError([completionError, error], "Completion and lock release failed")
+        // eslint-disable-next-line no-unsafe-finally
         throw error
       }
     }

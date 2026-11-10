@@ -1,6 +1,6 @@
 # Agent resource manager session context
 
-Estimated reading time: 7 minutes (150 WPM)
+Estimated reading time: 10 minutes (150 WPM)
 
 ## Working agreement
 
@@ -14,7 +14,7 @@ Estimated reading time: 7 minutes (150 WPM)
 
 - The loop checks registered agents and reconciles incomplete assignments. It fetches tasks, creates and recovers sessions, records executions, reports running work, and uses the scheduler's shared lock to move final cards and release reservations. Controlled tests cover both apps with a shared in-memory database; deployed API compatibility still needs verification.
 - Starting the manager can dispatch real work, change agent status, and move cards. Do not start it without a request. Unknown agent responses and missing URLs leave status unchanged; recovered agents are not automatically cleared from `needs_review`. An unchanged `idle` row may still be selected by the scheduler.
-- A separate `resource-manager-pass` lock prevents overlapping manager instances. A crash can leave that lock or `ticket-scheduling` behind; both require human review and are not cleared automatically. See [don't forget](dont-forget.md).
+- A separate `resource-manager-pass` lock prevents overlapping manager instances. A crash can leave that lock or `ticket-scheduling` behind; both require human review and are not cleared automatically. See [bookmark](bookmarks.md).
 - The Ticket Scheduler is a separate app. It reserves tickets and agents through incomplete assignments, implements its side of the shared lock, and enforces a configurable retry limit of three total recorded attempts by default. It does not start or monitor agents.
 - Both apps default to `../../shared-db/db.sqlite` and have independent path overrides. A human prepares the database, populates agents, and ensures their entries are valid at startup. The [fresh seed](../../shared-db/seed.sql) includes `agents.url`; an existing database's actual schema has not been verified. The example `agents.sql` inserts a frontend agent and duplicates it if rerun; neither seed nor drop should be run on a user database without authorization.
 
@@ -33,6 +33,15 @@ Estimated reading time: 7 minutes (150 WPM)
 
 ## Recent context
 
+- User requested a linter. Added ESLint with recommended JavaScript and TypeScript rules for source and tests, plus `npm run lint`; documented intentional exceptions for lock-release error handling. Lint, typecheck, and all 53 tests passed. npm audit reports a moderate minimatch advisory in the new development dependencies; ESLint 10 does not support Node 23.
+- User asked for a plain-English explanation of `src/components/assignment-reconciler.ts` lines 43–55: handling completed executions, agent status, abort attempts, and assignment completion. No code changes requested.
+- User requested an exact manual method to make a worker eligible after its PR merges. Created [manual-done.md](../manual-done.md): pause controllers, verify the merge and database, back up, move the card, and manually complete the execution and assignment and set the agent idle in one transaction. Tested the SQL against in-memory examples. The current manager can release an idle session before a PR merges, so it must be stopped while waiting; no live database or service was changed.
+- For now, a human will manually set the agent's status to idle in the shared database after the PR merges. The scheduler also requires the assignment to be complete before selecting the agent; the later manual procedure covers that completion and the ticket move.
+- For the proof of concept, a person manually gives PR review feedback to the worker. Automating feedback may be considered later if the concept is proven; it is deferred, not a current requirement.
+- User confirmed that merging the PR to main should also mark the ticket Done and complete the assignment. This is a policy decision for discussion, not implemented behavior.
+- User confirmed that while a PR waits for review or merge, the worker stays reserved for that ticket so it can handle requested changes. Session idleness and worker availability are distinct; PR tracking and assignment completion details remain to be discussed.
+- User wants this session limited to exploring a policy change: an agent worker transitions to idle once its PR has been merged to main. This is a proposal, not an implemented or fully specified policy. How it affects assignment completion, PR tracking, and other outcomes remains to be discussed.
+- User requested project resume. Reviewed the handoff, relevant manager code, shared seed, and neighboring notes; no services or implementation work were started. The scheduler's older shared-data reference incorrectly describes completion coordination as unimplemented and stale-lock warning decisions as deferred. A neighboring handoff also notes that an idle session is treated as successful even if an agent report says blocked; a safe blocker outcome still needs design and implementation.
 - User asked what remains before a first test run. Key prerequisites: isolated test board and agent workspace, both apps on the same prepared database and board, exported environment settings, no competing controller, and monitoring; deployed API behavior remains unverified. No live run was started.
 - User set a two-minute stale-lock threshold and chose terminal warnings with human recovery, not automatic removal. The manager checks both lock names and warns about invalid timestamps; recovery steps remain to be documented. All 50 manager tests, the build, and application/test typechecks passed.
 - User chose terminal logging for every failed task fetch; no separate alert is needed for the prototype. Existing reconciliation already logs each failed fetch and keeps the reservation. Next discuss stale-lock recovery.

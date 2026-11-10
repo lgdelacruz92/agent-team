@@ -33,7 +33,7 @@ services:
       OPENCODE_CONFIG_CONTENT: '{"default_agent":"cto"}'
     volumes:
       - ./workspace:/workspace
-      - ./opencode.json:/workspace/opencode.json:ro
+      - ./oc.json:/workspace/opencode.json:ro
       - ./agents/cto.md:/root/.config/opencode/agents/cto.md:ro
       - ./agents:/root/.config/opencode/team:ro
       - ./plugins/compact:/root/.config/opencode/plugins/compact:ro
@@ -52,7 +52,7 @@ services:
       OPENCODE_CONFIG_CONTENT: '{"default_agent":"backend"}'
     volumes:
       - ./workspace:/workspace
-      - ./opencode.json:/workspace/opencode.json:ro
+      - ./oc.json:/workspace/opencode.json:ro
       - ./agents/backend.md:/root/.config/opencode/agents/backend.md:ro
       - ./agents:/root/.config/opencode/team:ro
       - ./plugins/compact:/root/.config/opencode/plugins/compact:ro
@@ -73,7 +73,7 @@ services:
       GH_TOKEN: ${FRONTEND_GITHUB_TOKEN:-}
     volumes:
       - ./workspace:/workspace
-      - ./opencode.json:/workspace/opencode.json:ro
+      - ./oc.json:/workspace/opencode.json:ro
       - ./agents/frontend.md:/root/.config/opencode/agents/frontend.md:ro
       - ./agents:/root/.config/opencode/team:ro
       - ./plugins/compact:/root/.config/opencode/plugins/compact:ro
@@ -92,7 +92,7 @@ services:
       OPENCODE_CONFIG_CONTENT: '{"default_agent":"aws-solutions-architect"}'
     volumes:
       - ./workspace:/workspace
-      - ./opencode.json:/workspace/opencode.json:ro
+      - ./oc.json:/workspace/opencode.json:ro
       - ./agents/aws-solutions-architect.md:/root/.config/opencode/agents/aws-solutions-architect.md:ro
       - ./agents:/root/.config/opencode/team:ro
       - ./plugins/compact:/root/.config/opencode/plugins/compact:ro
